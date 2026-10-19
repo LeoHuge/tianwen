@@ -1,0 +1,217 @@
+@import "@fontsource/noto-sans-sc/latin-400.css";
+@import "@fontsource/noto-sans-sc/chinese-simplified-400.css";
+@import "@fontsource/noto-sans-sc/chinese-simplified-500.css";
+@import "@fontsource/noto-sans-sc/chinese-simplified-700.css";
+@import "@fontsource/noto-serif-sc/chinese-simplified-400.css";
+@import "@fontsource/noto-serif-sc/chinese-simplified-600.css";
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f4f0e6;
+  --color-paper-2: #fbf8f1;
+  --color-ink: #1c3144;
+  --color-ink-soft: #2c394e;
+  --color-muted: #5a606b;
+  --color-line: #ddd4c6;
+  --color-frame: #857a68;
+  --color-cinnabar: #1c3144;
+  --color-on-cinnabar: #f4f0e6;
+  --color-warn: #b23a2e;
+  --color-ok: #3e6b4f;
+  --color-note: #8a5a12;
+  --color-brass: #7a5c1e;
+  --color-brass-soft: #efe5cf;
+  --color-sheet: #fffdf8;
+  --font-sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --radius-sm: 2px;
+  --shadow-sheet: 0 1px 0 rgb(255 255 255 / 80%) inset, 0 1px 2px rgb(28 49 68 / 4%), 0 22px 44px -34px rgb(28 49 68 / 50%);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background-color: var(--color-paper);
+    background-image: linear-gradient(180deg, rgb(255 252 246 / 90%), transparent 320px);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.75;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    line-height: 1.45;
+    text-wrap: pretty;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary {
+    list-style: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-cinnabar);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    border-color: var(--color-ink);
+    box-shadow: 0 0 0 3px rgb(28 49 68 / 10%);
+  }
+  input,
+  select,
+  textarea {
+    transition:
+      border-color 0.15s ease,
+      background-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: color-mix(in srgb, var(--color-muted) 72%, transparent);
+  }
+  ::selection {
+    background: var(--color-cinnabar);
+    color: var(--color-on-cinnabar);
+  }
+}
+
+.sheet {
+  background: var(--color-paper-2);
+  border: 1px solid color-mix(in srgb, var(--color-frame) 42%, var(--color-line));
+  box-shadow: var(--shadow-sheet);
+}
+
+.kicker {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--color-muted);
+}
+
+.poster {
+  position: relative;
+  display: flex;
+  min-height: 460px;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  background:
+    radial-gradient(420px 220px at 100% 0%, rgb(244 240 230 / 8%), transparent 70%),
+    #1c3144;
+  color: #f4f0e6;
+  padding: 32px 36px 36px;
+}
+.poster::before,
+.poster::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: rgb(244 240 230 / 45%);
+  border-style: solid;
+}
+.poster::before {
+  top: 16px;
+  left: 16px;
+  border-width: 1px 0 0 1px;
+}
+.poster::after {
+  right: 16px;
+  bottom: 16px;
+  border-width: 0 1px 1px 0;
+}
+.poster-logo {
+  width: 32px;
+  height: 32px;
+}
+.poster-top,
+.poster-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.poster-kicker {
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  color: rgb(244 240 230 / 62%);
+}
+.poster-title {
+  display: flex;
+  gap: 0.08em;
+  margin-top: 10px;
+  font-family: var(--font-serif);
+  font-size: clamp(88px, 12vw, 148px);
+  font-weight: 600;
+  line-height: 0.88;
+  letter-spacing: 0.02em;
+}
+.poster-title span {
+  display: block;
+  animation: poster-in 1s ease both;
+}
+.poster-title span:last-child {
+  animation-delay: 0.12s;
+}
+.poster-line {
+  max-width: 16em;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+}
+.poster-meta {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: rgb(244 240 230 / 62%);
+}
+@keyframes poster-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .poster {
+    min-height: 340px;
+    padding: 28px 24px 24px;
+  }
+  .poster-title {
+    font-size: 80px;
+  }
+  .poster-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
