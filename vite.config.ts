@@ -1,5 +1,6 @@
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -8,6 +9,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
+// @ts-expect-error JS module alongside the TS vite config
+import { snapshotOgIdentity } from "./scripts/grok-pwa-shared.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
@@ -30,6 +33,55 @@ function hasGlobbedMigrations(root: string): boolean {
  * migrations — no schema to apply — skips it entirely rather than paying for a
  * PGLite instance it never queries.
  */
+/**
+ * Nitro rebundles server middleware on its own. On Windows the `?raw` import
+ * is not a legal path, and `virtual:grok-og-identity` is only registered on
+ * the Vite plugin — without this, GitHub Pages prerender returns 503.
+ */
+function nitroServerAssetsPlugin(root: string): Plugin {
+  const rawId = "\0install-page-raw";
+  const ogId = "\0virtual:grok-og-identity";
+  return {
+    name: "app-builder:nitro-server-assets",
+    resolveId(id) {
+      if (id === "virtual:grok-og-identity") return ogId;
+      if (id.includes("install-page.html?raw")) return rawId;
+    },
+    load(id) {
+      if (id === ogId) {
+        return `export const grokOgIdentity = ${JSON.stringify(snapshotOgIdentity(root))};`;
+      }
+      if (id === rawId) {
+        const html = readFileSync(join(root, "scripts/install-page.html"), "utf8");
+        return `export default ${JSON.stringify(html)};`;
+      }
+    },
+  };
+}
+
+function nitroStaticEntryPlugin(): Plugin {
+  return {
+    name: "app-builder:nitro-static-entry",
+    apply: "build",
+    enforce: "post",
+    config() {
+      if (process.env.NITRO_PRESET !== "github_pages") return;
+      const entry = fileURLToPath(new URL("./server/static-entry.ts", import.meta.url));
+      return {
+        environments: {
+          nitro: {
+            build: {
+              emptyOutDir: false,
+              rolldownOptions: { input: entry },
+              rollupOptions: { input: entry },
+            },
+          },
+        },
+      };
+    },
+  };
+}
+
 function pgliteBootstrapPlugin(): Plugin {
   return {
     name: "app-builder:pglite-bootstrap",
@@ -178,7 +230,14 @@ export default defineConfig(({ command, isPreview }) => ({
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
             serverDir: "./server",
+            ...(process.env.VITE_BASE_PATH && process.env.VITE_BASE_PATH !== "/"
+              ? { baseURL: process.env.VITE_BASE_PATH }
+              : {}),
+            rollupConfig: {
+              plugins: [nitroServerAssetsPlugin(process.cwd())],
+            },
           }),
+          nitroStaticEntryPlugin(),
         ]
       : []),
     viteReact(),
