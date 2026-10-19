@@ -1,4 +1,4 @@
-import{r as e}from"./rolldown-runtime-hePW80VL.js";import{N as t,c as n}from"./link-B2hEhiEU.js";import{n as r,o as i,t as a}from"./pay-dialog-BW8Y-Zg6.js";import{D as o,O as s,m as c,t as l}from"./shell--4rNCY5S.js";var u=e(t()),d=[{name:`describe.do`,body:`* 天问 · Stata 描述草稿
+import{r as e}from"./rolldown-runtime-hePW80VL.js";import{N as t,c as n}from"./link-B2hEhiEU.js";import{n as r,o as i,t as a}from"./pay-dialog-21YT6xtB.js";import{D as o,O as s,m as c,t as l}from"./shell--4rNCY5S.js";var u=e(t()),d=[{name:`describe.do`,body:`* 天问 · Stata 描述草稿
 * 另付项目。不成稿的一部分。
 * 不含 Stata 许可。列名是占位，换成你的表再跑。
 * 这里不写回归结果。
