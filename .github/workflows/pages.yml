@@ -29,6 +29,7 @@ jobs:
           NITRO_PRESET: github_pages
           VITE_BASE_PATH: /tianwen/
           VITE_AUTH_ENABLED: "false"
+          VITE_STATIC_PREVIEW: "true"
       - name: Add a fallback page for client routes
         run: |
           if [ -f .output/public/index.html ]; then
