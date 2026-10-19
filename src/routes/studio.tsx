@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HitList } from "@/components/index-tags";
+import { LiteratureDesk } from "@/components/literature-links";
 import { InstrumentView } from "@/components/instrument-view";
 import { PayDialog } from "@/components/pay-dialog";
 import { Button, controlClass, Field } from "@/components/primitives";
@@ -255,7 +256,7 @@ function StudioPage() {
       patchProject({
         hotHits: reroll ? current.hotHits : [],
         hotKey: keywords.join("|"),
-        searchNote: "这是公开预览，没有连接文献库。题目按关键词和研究对象生成。",
+        searchNote: "",
         candidates: items,
         candidateKey: briefKeyOf(useLedger.getState().project),
         candidateNote: "",
@@ -489,7 +490,9 @@ function StudioPage() {
           <div className="relative bg-ink px-6 py-6 text-on-cinnabar">
             <span className="absolute inset-y-0 left-0 w-1 bg-brass" aria-hidden="true" />
             <p className="text-lg">{!ready ? "正在打开" : access.upgraded ? `已升级${contract.name}` : access.topic ? "开题包已付" : "还没有付款"}</p>
-            <p className="mt-2 text-sm leading-7 text-on-cinnabar/75">检索 1 到 3 分钟，出题不到 1 分钟，出问卷约 1 分钟。收数据另算。</p>
+            <p className="mt-2 text-sm leading-7 text-on-cinnabar/75">
+              {isStaticPreview() ? "文献到对应的库里检索。题目在本页生成，不扣款。" : "检索 1 到 3 分钟，出题不到 1 分钟，出问卷约 1 分钟。收数据另算。"}
+            </p>
             <p className="mt-5 flex gap-5 text-sm">
               <button className="border-b border-on-cinnabar/50 pb-0.5" onClick={() => replaceProject(exampleProject())}>
                 看例子
@@ -586,7 +589,9 @@ function StudioPage() {
         <section id="topics" className="mt-12">
           <h2 className="text-xl">② 检索并出 3 个题</h2>
           <p className="mt-2 text-sm leading-7 text-ink-soft">
-            按四个关键词检索 2021 年以来的中文期刊、外文期刊，以及国家社科基金、国家自然科学基金立项。中文标注 CSSCI来源、CSSCI扩展版、北大核心、AMI 各级和 CSCD。外文分别标注 SSCI、SCIE、SCI 和 ESCI，不互相替代。课题标注重大、重点、一般、面上和青年。检索结束后给出 3 个具体题目。若检索未完成，仍会给出题目。
+            {isStaticPreview()
+              ? "四个关键词写好后，打开中国知网、万方、维普、外文检索，以及国家自然科学基金、国家社科基金。中文看 CSSCI来源、CSSCI扩展版、北大核心、AMI 各级和 CSCD。外文的 SSCI、SCIE、SCI、ESCI 分别核对，不互相替代。课题看重大、重点、一般、面上和青年。本页同时给出 3 个题目。"
+              : "按四个关键词检索 2021 年以来的中文期刊、外文期刊，以及国家社科基金、国家自然科学基金立项。中文标注 CSSCI来源、CSSCI扩展版、北大核心、AMI 各级和 CSCD。外文分别标注 SSCI、SCIE、SCI 和 ESCI，不互相替代。课题标注重大、重点、一般、面上和青年。检索结束后给出 3 个具体题目。若检索未完成，仍会给出题目。"}
           </p>
           <details className="mt-3 text-sm">
             <summary className="min-h-11 py-2 text-muted underline underline-offset-4">出题用哪个模型（默认即可）</summary>
@@ -608,9 +613,20 @@ function StudioPage() {
           {briefIssue && !access.topic ? <p className="mt-3 text-sm text-warn">出题前还差一步：{briefIssue}</p> : null}
           {!access.topic ? (
             <Button className="mt-4" disabled={!ready || generating || Boolean(briefIssue)} onClick={() => void runGenerate(false)}>
-              {busy === "search" ? `正在检索 · ${clock(phaseSec)}` : busy === "topic" ? `正在出题 · ${clock(phaseSec)}` : candidatesFresh ? "重新检索并出题" : "检索并出 3 个题"}
+              {busy === "search"
+                ? `正在检索 · ${clock(phaseSec)}`
+                : busy === "topic"
+                  ? `正在出题 · ${clock(phaseSec)}`
+                  : isStaticPreview()
+                    ? candidatesFresh
+                      ? "重新出 3 个题"
+                      : "出 3 个题"
+                    : candidatesFresh
+                      ? "重新检索并出题"
+                      : "检索并出 3 个题"}
             </Button>
           ) : null}
+          {isStaticPreview() ? <LiteratureDesk keywords={project.keywords} /> : null}
           {busy === "search" ? (
             <div className="mt-3 text-sm leading-7 text-ink">
               <p className="tabular-nums">检索已进行 {clock(phaseSec)}。通常 1 到 3 分钟，超过 3 分钟会自动停下，直接出题。</p>
@@ -620,7 +636,7 @@ function StudioPage() {
             </div>
           ) : null}
           {busy === "topic" ? <p className="mt-3 text-sm tabular-nums leading-7 text-ink">正在出题 {clock(phaseSec)}。模型不可用时会按规则先出，不会空手。</p> : null}
-          {project.searchNote && project.hotKey === project.keywords.map((word) => word.trim()).join("|") ? (
+          {!isStaticPreview() && project.searchNote && project.hotKey === project.keywords.map((word) => word.trim()).join("|") ? (
             <p className="mt-3 border border-line bg-paper-2 px-3 py-2 text-sm text-ink-soft">{project.searchNote}</p>
           ) : null}
           {project.hotHits.length && project.hotKey === project.keywords.map((word) => word.trim()).join("|") ? (
