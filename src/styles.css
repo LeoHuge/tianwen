@@ -113,46 +113,73 @@
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
-  background:
-    radial-gradient(420px 220px at 100% 0%, rgb(244 240 230 / 8%), transparent 70%),
-    #1c3144;
+  background: #1c3144;
   color: #f4f0e6;
   padding: 32px 36px 36px;
 }
-.poster::before,
-.poster::after {
-  content: "";
+.poster-wash {
   position: absolute;
-  width: 18px;
-  height: 18px;
-  border-color: rgb(244 240 230 / 45%);
-  border-style: solid;
+  inset: -30%;
+  background:
+    radial-gradient(380px 240px at 72% 18%, rgb(244 240 230 / 14%), transparent 62%),
+    radial-gradient(280px 180px at 12% 88%, rgb(196 168 106 / 10%), transparent 70%);
+  animation: poster-wash 14s ease-in-out infinite alternate;
+  pointer-events: none;
 }
-.poster::before {
+.poster-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: rgb(244 240 230 / 50%);
+  border-style: solid;
+  pointer-events: none;
+}
+.poster-corner-nw {
   top: 16px;
   left: 16px;
   border-width: 1px 0 0 1px;
+  transform-origin: top left;
+  animation: poster-corner 1.1s cubic-bezier(0.22, 0.7, 0.2, 1) both;
 }
-.poster::after {
+.poster-corner-se {
   right: 16px;
   bottom: 16px;
   border-width: 0 1px 1px 0;
+  transform-origin: bottom right;
+  animation: poster-corner 1.1s cubic-bezier(0.22, 0.7, 0.2, 1) 0.15s both;
 }
 .poster-logo {
   width: 32px;
   height: 32px;
 }
+.poster-logo rect:nth-child(2),
+.poster-logo path {
+  stroke-dasharray: 64;
+  stroke-dashoffset: 64;
+  animation: poster-draw 1.7s cubic-bezier(0.22, 0.7, 0.2, 1) 0.25s forwards;
+}
+.poster-logo path:last-child {
+  animation-delay: 0.55s;
+}
 .poster-top,
 .poster-foot {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
 }
+.poster-body {
+  position: relative;
+}
 .poster-kicker {
   font-size: 12px;
   letter-spacing: 0.28em;
   color: rgb(244 240 230 / 62%);
+  animation: poster-rise 0.9s cubic-bezier(0.22, 0.7, 0.2, 1) 0.35s both;
+}
+.poster-body .poster-kicker {
+  animation-delay: 0.55s;
 }
 .poster-title {
   display: flex;
@@ -166,29 +193,92 @@
 }
 .poster-title span {
   display: block;
-  animation: poster-in 1s ease both;
+  animation: poster-title 1.15s cubic-bezier(0.16, 0.84, 0.24, 1) both;
 }
 .poster-title span:last-child {
-  animation-delay: 0.12s;
+  animation-delay: 0.18s;
+}
+.poster-rule {
+  display: block;
+  width: 4.75rem;
+  height: 1px;
+  margin-top: 22px;
+  background: #e4d3b0;
+  transform-origin: left center;
+  animation: poster-rule 8.5s cubic-bezier(0.22, 0.7, 0.2, 1) infinite;
 }
 .poster-line {
   max-width: 16em;
   font-size: 15px;
   letter-spacing: 0.06em;
+  animation: poster-rise 0.9s cubic-bezier(0.22, 0.7, 0.2, 1) 0.85s both;
 }
 .poster-meta {
+  display: flex;
+  gap: 1.15rem;
   font-size: 12px;
   letter-spacing: 0.12em;
   color: rgb(244 240 230 / 62%);
+  animation: poster-rise 0.9s cubic-bezier(0.22, 0.7, 0.2, 1) 1.05s both;
 }
-@keyframes poster-in {
+@keyframes poster-wash {
+  from {
+    transform: translate3d(-4%, -3%, 0);
+  }
+  to {
+    transform: translate3d(6%, 4%, 0);
+  }
+}
+@keyframes poster-corner {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: scale(0.35);
   }
   to {
     opacity: 1;
     transform: none;
+  }
+}
+@keyframes poster-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes poster-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes poster-title {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes poster-rule {
+  0%,
+  8% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  28%,
+  74% {
+    transform: scaleX(1);
+    opacity: 0.9;
+  }
+  92%,
+  100% {
+    transform: scaleX(0);
+    opacity: 0;
   }
 }
 
@@ -213,5 +303,13 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  .poster-wash,
+  .poster-rule {
+    animation: none !important;
+  }
+  .poster-logo rect,
+  .poster-logo path {
+    stroke-dashoffset: 0;
   }
 }

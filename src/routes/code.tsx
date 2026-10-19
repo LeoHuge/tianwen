@@ -6,6 +6,7 @@ import { Shell } from "@/components/shell";
 import { yuan, planById } from "@/lib/research/catalog";
 import { CODE_FILES } from "@/lib/research/code-source";
 import { useLedger } from "@/lib/research/store";
+import { isStaticPreview } from "@/lib/research/static-preview";
 
 export const Route = createFileRoute("/code")({ component: CodePage });
 
@@ -33,7 +34,7 @@ function CodePage() {
           {ready && unlocked ? (
             <p className="text-sm text-muted">这份浏览器已经解开脚本。</p>
           ) : (
-            <Button onClick={() => setOpen(true)}>付 {yuan(price)}，看全文</Button>
+            <Button onClick={() => setOpen(true)}>{isStaticPreview() ? "点击解锁全文" : `付 ${yuan(price)}，看全文`}</Button>
           )}
         </div>
         <div className="mt-10">

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { useNavigate } from "@tanstack/react-router";
 import { planById, yuan } from "@/lib/research/catalog";
+import { isStaticPreview } from "@/lib/research/static-preview";
 import { useLedger } from "@/lib/research/store";
 import type { PlanId } from "@/lib/research/types";
 import { Button } from "./primitives";
@@ -31,6 +32,7 @@ export function PayDialog({
   const [src, setSrc] = useState("");
   const order = orders.find((item) => item.id === orderId) ?? null;
   const plan = planId ? planById(planId) : null;
+  const preview = isStaticPreview();
 
   useEffect(() => {
     if (!open || !planId) return;
@@ -64,32 +66,38 @@ export function PayDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/45 backdrop-blur-[2px]" />
         <Dialog.Content className="sheet fixed top-1/2 left-1/2 z-50 max-h-[90vh] w-[min(100%-2rem,28rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-6">
-          <Dialog.Title className="font-serif text-2xl text-ink">扫码支付 · 演示</Dialog.Title>
+          <Dialog.Title className="font-serif text-2xl text-ink">{preview ? "点击解锁" : "扫码支付 · 演示"}</Dialog.Title>
           <Dialog.Description className="mt-1 text-sm text-muted">
-            {plan.name} · {yuan(plan.price)}。此码不会发起真实扣款。
+            {plan.name} · {yuan(plan.price)}。{preview ? "公开预览不会扣款，点一下即解锁，只记在这台浏览器。" : "此码不会发起真实扣款。"}
           </Dialog.Description>
           {note ? <p className="mt-2 text-sm text-ink-soft">{note}</p> : null}
-          <div className="mt-4 flex gap-2">
-            {(["wechat", "alipay"] as const).map((channel) => (
-              <button
-                key={channel}
-                className={
-                  order.channel === channel
-                    ? "min-h-11 flex-1 bg-ink px-3 text-sm text-on-cinnabar"
-                    : "min-h-11 flex-1 border border-line bg-paper px-3 text-sm text-ink"
-                }
-                onClick={() => setChannel(order.id, channel)}
-              >
-                {channel === "wechat" ? "微信支付" : "支付宝"}
-              </button>
-            ))}
-          </div>
-          <div className="mt-4 flex flex-col items-center border border-line bg-paper p-4">
-            {src ? <img src={src} alt="演示订单二维码" className="size-52" /> : <div className="size-52" />}
-            <p className="mt-2 text-center text-xs text-muted">单号 {order.id} · 扫出来也只是一段说明文字</p>
-          </div>
+          {preview ? null : (
+            <>
+              <div className="mt-4 flex gap-2">
+                {(["wechat", "alipay"] as const).map((channel) => (
+                  <button
+                    key={channel}
+                    className={
+                      order.channel === channel
+                        ? "min-h-11 flex-1 bg-ink px-3 text-sm text-on-cinnabar"
+                        : "min-h-11 flex-1 border border-line bg-paper px-3 text-sm text-ink"
+                    }
+                    onClick={() => setChannel(order.id, channel)}
+                  >
+                    {channel === "wechat" ? "微信支付" : "支付宝"}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-col items-center border border-line bg-paper p-4">
+                {src ? <img src={src} alt="演示订单二维码" className="size-52" /> : <div className="size-52" />}
+                <p className="mt-2 text-center text-xs text-muted">单号 {order.id} · 扫出来也只是一段说明文字</p>
+              </div>
+            </>
+          )}
           <p className="mt-3 text-xs text-brass">
-            生成前可放弃。模拟到账后，数字内容按购买页的规则视为已交付演示权益，换浏览器不会保留。
+            {preview
+              ? "记录存在这台浏览器。换浏览器、清站点数据后需要重新点击解锁。"
+              : "生成前可放弃。模拟到账后，数字内容按购买页的规则视为已交付演示权益，换浏览器不会保留。"}
           </p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Button
@@ -101,7 +109,7 @@ export function PayDialog({
                 if (plan.id === "code") void navigate({ to: "/code" });
               }}
             >
-              模拟到账，解锁
+              {preview ? "点击解锁" : "模拟到账，解锁"}
             </Button>
             <Dialog.Close asChild>
               <Button tone="ghost" className="flex-1">

@@ -18,7 +18,7 @@ const MATRIX: string[][] = [
   ["知情同意与质量控制", "不含", "含", "含", "含"],
   ["描述统计", "本地", "本地", "本地", "本地"],
   ["成稿初稿", "不含", "不含", "含", "含"],
-  ["结构性修订", "0 轮", "题项 1 轮", "1 轮", "3 轮"],
+  ["结构性修订", "0 轮", "题项 1 轮", "1 轮", "3 轮人工协助"],
   ["文献逐条核对", "不做", "不做", "不做", "不做"],
   ["统计结果", "你自己算", "你自己算", "你自己算", "你自己算"],
 ];
@@ -57,9 +57,9 @@ function PricingPage() {
               </tr>
               <tr className="border-b border-line">
                 <td className="py-3 pr-4">三包合买</td>
-                <td className="py-3 pr-4 tabular-nums">¥1,099</td>
+                <td className="py-3 pr-4 tabular-nums">¥1,199</td>
                 <td className="py-3 pr-4 tabular-nums">¥199</td>
-                <td className="py-3 pr-4 tabular-nums">¥900</td>
+                <td className="py-3 pr-4 tabular-nums">¥1,000</td>
                 <td className="py-3">三轮</td>
               </tr>
               <tr className="border-b border-line">
@@ -127,7 +127,7 @@ function PricingPage() {
               <li>开题包 ¥199。检索、三个题、按建议改题。觉得题不行就停，不用再花钱。</li>
               <li>分析包 ¥599。一份能发出去的问卷或访谈提纲，样本量按公式算出并写明出处。不含替你去发。</li>
               <li>成稿包 ¥799，已买开题包补 ¥600。从问卷到初稿，能改一轮。不含文献核对，不含统计代码。</li>
-              <li>三包合买 ¥1,099，已买开题包补 ¥900。同样的交付，开题后最常改的三轮都在里面。第 4 轮 ¥140。</li>
+              <li>三包合买 ¥1,199，已买开题包补 ¥1,000。同样的交付，三轮结构性修订由人工协助。第 4 轮 ¥140。</li>
               <li>年匣 ¥6,120。给带学生的人，8 个题，每个仍是三轮。</li>
               <li>统计代码 ¥2,520。要 Stata、R 或访谈编码表，得另外买。</li>
             </ul>

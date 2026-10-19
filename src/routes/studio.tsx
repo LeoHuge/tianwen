@@ -30,6 +30,7 @@ import { computeSample, sampleHtml, sampleMarkdown, sanitize, type SamplePlan } 
 import { buildManuscript, manuscriptMarkdown, vagueKeywords } from "@/lib/research/skeleton";
 import { DEMO_CSV, readDataFile, statsSentence, summarizeCsv } from "@/lib/research/stats";
 import { projectAccess, useLedger } from "@/lib/research/store";
+import { isStaticPreview } from "@/lib/research/static-preview";
 import { checkSubject, subjectSentence } from "@/lib/research/subject";
 import { rulesCandidates } from "@/lib/research/topic-parts";
 import { BLANK_SUBJECT, DISCLOSURE, type Candidate, type HotHit, type Paradigm, type PlanId, type Project } from "@/lib/research/types";
@@ -189,6 +190,7 @@ function StudioPage() {
     if (current.instrumentKey === key && current.instrumentDoc) return;
     const base = buildInstrument(seed);
     patchProject({ instrumentDoc: base, instrumentKey: key, samplePlan: planWith(current.samplePlan, base) });
+    if (isStaticPreview()) return;
     setBusy("instrument");
     void writeInstrument({
       data: { kind: seed.kind, title: seed.title, question: seed.question, subject: subjectSentence(seed.subject, false), discipline: seed.discipline, parts: seed.parts, pattern: seed.pattern, note: "" },
@@ -243,6 +245,24 @@ function StudioPage() {
     if (issue) {
       setMessage(issue);
       document.getElementById("brief")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (isStaticPreview()) {
+      const current = useLedger.getState().project;
+      const keywords = current.keywords.map((word) => word.trim());
+      const avoid = reroll ? current.candidates.map((item) => item.title) : [];
+      const items = localRules(current, reroll ? current.hotHits : [], avoid);
+      patchProject({
+        hotHits: reroll ? current.hotHits : [],
+        hotKey: keywords.join("|"),
+        searchNote: "这是公开预览，没有连接文献库。题目按关键词和研究对象生成。",
+        candidates: items,
+        candidateKey: briefKeyOf(useLedger.getState().project),
+        candidateNote: "",
+        rerolls: reroll ? current.rerolls + 1 : current.rerolls,
+      });
+      if (reroll) setRevealOpen(true);
+      else scrollTo("topics");
       return;
     }
     setMessage("");
@@ -353,6 +373,10 @@ function StudioPage() {
   async function writeModel() {
     const current = useLedger.getState().project;
     if (!current.topic) return;
+    if (isStaticPreview()) {
+      setMessage("这是公开预览，初稿用页面里已经生成的版本，不另连模型。");
+      return;
+    }
     setBusy("model");
     setMessage("");
     try {
@@ -394,6 +418,10 @@ function StudioPage() {
     }
     if (note.trim().length < 4) {
       setMessage("写清要改哪里，例如「孤独感部分少一题，加一条关于夜间的题」，不要只写「不好」。");
+      return;
+    }
+    if (isStaticPreview()) {
+      setMessage("这是公开预览，修订不连模型，这一轮不消耗。");
       return;
     }
     const current = useLedger.getState().project;
@@ -607,13 +635,15 @@ function StudioPage() {
                 <div className="border border-ink bg-paper-2 p-4">
                   <p className="text-base">三个题目已经出好了。</p>
                   <p className="mt-1 text-sm leading-7 text-muted">
-                    付开题包 {yuan(TOPIC_FEE)} 后马上弹出。题目弹出即视为交付，不退；之后要问卷和初稿，只补差价。
+                    {isStaticPreview()
+                      ? "公开预览不会扣款。点击即可解锁并查看，记录只留在这台浏览器。"
+                      : `付开题包 ${yuan(TOPIC_FEE)} 后马上弹出。题目弹出即视为交付，不退；之后要问卷和初稿，只补差价。`}
                   </p>
                   <div className="mt-4">
                     <LockedTopics count={project.candidates.length} />
                   </div>
                   <Button className="mt-4 w-full sm:w-auto" onClick={() => pay("topic")}>
-                    付开题包 {yuan(TOPIC_FEE)}，弹出三个题
+                    {isStaticPreview() ? "点击解锁，查看三个题" : `付开题包 ${yuan(TOPIC_FEE)}，弹出三个题`}
                   </Button>
                 </div>
               ) : null}

@@ -5,6 +5,7 @@ import { Button } from "@/components/primitives";
 import { Shell } from "@/components/shell";
 import { yuan } from "@/lib/research/catalog";
 import { useLedger } from "@/lib/research/store";
+import { isStaticPreview } from "@/lib/research/static-preview";
 import type { PlanId } from "@/lib/research/types";
 
 export const Route = createFileRoute("/orders")({ component: OrdersPage });
@@ -34,7 +35,7 @@ function OrdersPage() {
               </div>
               <p className="font-serif text-2xl tabular-nums">{yuan(order.amount)}</p>
               {order.status === "paid" ? (
-                <span className="text-sm text-brass">已模拟到账</span>
+                <span className="text-sm text-brass">{isStaticPreview() ? "已解锁" : "已模拟到账"}</span>
               ) : (
                 <Button
                   tone="ink"
@@ -43,7 +44,7 @@ function OrdersPage() {
                     setOpen(true);
                   }}
                 >
-                  继续演示支付
+                  {isStaticPreview() ? "点击解锁" : "继续演示支付"}
                 </Button>
               )}
             </li>

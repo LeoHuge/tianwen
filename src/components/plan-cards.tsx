@@ -1,4 +1,5 @@
 import { PLANS, yuan } from "@/lib/research/catalog";
+import { isStaticPreview } from "@/lib/research/static-preview";
 import type { PlanId } from "@/lib/research/types";
 import { Button } from "./primitives";
 
@@ -35,7 +36,7 @@ export function PlanCards({
           </ul>
           <p className="mt-4 text-xs text-brass">{plan.revisions}</p>
           <Button className="mt-4" tone={plan.recommended ? "primary" : "ink"} onClick={() => onBuy(plan.id)}>
-            扫码购买（演示）
+            {isStaticPreview() ? "点击解锁" : "扫码购买（演示）"}
           </Button>
         </article>
       ))}
