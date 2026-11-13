@@ -194,6 +194,7 @@
   font-weight: 600;
   line-height: 0.88;
   letter-spacing: 0.02em;
+  animation: poster-pair 6.4s ease-in-out 1.9s infinite;
 }
 .poster-title span:not(.poster-sheen) {
   display: block;
@@ -217,11 +218,6 @@
   animation:
     poster-title 1.35s cubic-bezier(0.16, 0.84, 0.24, 1) 0.42s both,
     poster-glyph 6.4s linear 1.9s infinite;
-}
-.poster-title span:nth-child(2) {
-  animation:
-    poster-title-b 1.35s cubic-bezier(0.16, 0.84, 0.24, 1) 0.62s both,
-    poster-glyph-b 6.4s linear 1.9s infinite;
 }
 .poster-sheen {
   position: absolute;
@@ -353,21 +349,18 @@
     transform: none;
   }
 }
-@keyframes poster-title-b {
-  0% {
-    opacity: 0;
-    filter: blur(8px);
-    transform: translateY(54px) rotate(-2.4deg);
-  }
-  64% {
+@keyframes poster-pair {
+  0%,
+  16% {
     opacity: 1;
-    filter: blur(0);
-    transform: translateY(-5px) rotate(0deg);
   }
+  38%,
+  62% {
+    opacity: 0;
+  }
+  84%,
   100% {
     opacity: 1;
-    filter: none;
-    transform: none;
   }
 }
 @keyframes poster-glyph {
@@ -376,14 +369,6 @@
   }
   to {
     background-position: -80% 50%;
-  }
-}
-@keyframes poster-glyph-b {
-  from {
-    background-position: 40% 50%;
-  }
-  to {
-    background-position: -120% 50%;
   }
 }
 @keyframes poster-sheen {
@@ -450,7 +435,8 @@
   }
   .poster-wash,
   .poster-rule,
-  .poster-sheen {
+  .poster-sheen,
+  .poster-title {
     animation: none !important;
   }
   .poster-rule {
