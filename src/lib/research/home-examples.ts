@@ -1,12 +1,16 @@
+import { HOME_EXAMPLE_BANK } from "./home-example-bank";
+import type { Paradigm } from "./types";
+
 export type HomeExample = {
   field: string;
-  unit: "个人" | "家庭" | "社区／村" | "组织" | "地区";
+  unit: "个人" | "家庭" | "社区／村" | "组织" | "地区" | "文本";
   keywords: [string, string, string, string];
   where: string;
   who: string;
   stage: string;
   condition: string;
   title: string;
+  text?: boolean;
 };
 
 export const HOME_EXAMPLES: Record<string, HomeExample> = {
@@ -30,7 +34,7 @@ export const HOME_EXAMPLES: Record<string, HomeExample> = {
     condition: "正在接受居家养老服务",
     title: "个案工作介人对城市高龄独居老人社会支持的影响",
   },
-  公共管理: {
+  公共管理学: {
     field: "基层治理",
     unit: "社区／村",
     keywords: ["网格员", "基层治理", "回应性", "居民参与"],
@@ -40,7 +44,7 @@ export const HOME_EXAMPLES: Record<string, HomeExample> = {
     condition: "近一年联系过网格员",
     title: "网格化管理对城市社区居民政府回应性评价的影响：居民参与的中介作用",
   },
-  新闻传播: {
+  新闻传播学: {
     field: "健康传播",
     unit: "个人",
     keywords: ["健康短视频", "信息甄别", "风险感知", "接种意愿"],
@@ -80,7 +84,7 @@ export const HOME_EXAMPLES: Record<string, HomeExample> = {
     condition: "户籍在本村",
     title: "村务公开对村民政治信任的影响：程序公平感知的中介作用",
   },
-  经济学: {
+  应用经济学: {
     field: "劳动经济",
     unit: "个人",
     keywords: ["灵活就业", "收入波动", "社会保障", "消费"],
@@ -120,7 +124,7 @@ export const HOME_EXAMPLES: Record<string, HomeExample> = {
     condition: "本学期修读思政课",
     title: "思政课获得感对大学生理论认同的影响：日常实践的中介作用",
   },
-  图书情报与档案: {
+  信息资源管理: {
     field: "情报学",
     unit: "个人",
     keywords: ["信息素养", "数据库", "检索焦虑", "写作效能"],
@@ -150,7 +154,7 @@ export const HOME_EXAMPLES: Record<string, HomeExample> = {
     condition: "少数民族学生",
     title: "双语教育经历对少数民族中学生文化认同的影响",
   },
-  管理学: {
+  工商管理学: {
     field: "组织行为",
     unit: "组织",
     keywords: ["远程办公", "工作自主", "情绪耗竭", "离职倾向"],
@@ -200,7 +204,18 @@ export const HOME_EXAMPLES: Record<string, HomeExample> = {
     condition: "每周阅读网络小说",
     title: "网络文学阅读对中文系学生身份认同的影响：写作实践的中介作用",
   },
-  历史学: {
+  外国语言文学: {
+    field: "翻译学",
+    unit: "文本",
+    text: true,
+    keywords: ["目的论", "字幕翻译", "文化负载词", "归化"],
+    where: "《青春变形记》中文字幕",
+    who: "电影字幕",
+    stage: "大陆公映版",
+    condition: "全片对白字幕",
+    title: "目的论视角下《青春变形记》中文字幕中文化负载词的研究",
+  },
+  中国史: {
     field: "口述史",
     unit: "社区／村",
     keywords: ["口述史", "集体记忆", "地方认同", "代际传承"],
@@ -212,6 +227,125 @@ export const HOME_EXAMPLES: Record<string, HomeExample> = {
   },
 };
 
-export function homeExample(discipline: string): HomeExample {
-  return HOME_EXAMPLES[discipline] ?? HOME_EXAMPLES["社会学"]!;
+const EXAMPLE_ALIAS: Record<string, string> = {
+  新闻传播: "新闻传播学",
+  公共管理: "公共管理学",
+  经济学: "应用经济学",
+  图书情报与档案: "信息资源管理",
+  管理学: "工商管理学",
+  历史学: "中国史",
+};
+
+export function homeExample(discipline: string): HomeExample | null {
+  return HOME_EXAMPLES[discipline] ?? HOME_EXAMPLE_BANK[discipline] ?? HOME_EXAMPLES[EXAMPLE_ALIAS[discipline] ?? ""] ?? null;
+}
+
+/** 同一条虚构材料：定量用影响句，定性用「如何形塑」，文本分析用一份文本，元分析用一批已发表研究。 */
+export function paradigmExampleTitle(example: HomeExample, paradigm: "" | Paradigm): string {
+  if (paradigm === "定性" && !example.text) return qualitativeTitle(example);
+  if (paradigm === "文本分析") return textMaterial(example).title;
+  if (paradigm === "元分析") return metaMaterial(example).title;
+  return example.title;
+}
+
+export type MetaMaterial = {
+  title: string;
+  relation: string;
+  studies: string;
+  scope: string;
+  extract: string;
+};
+
+/** 元分析的对象是已经发表、并报告了效应量的研究。合并效应不在示例里写。 */
+export function metaMaterial(example: HomeExample): MetaMaterial {
+  const { iv, dv, mechanism } = effectParts(example);
+  const left = iv || example.keywords[0] || "这一条件";
+  const right = dv || example.keywords[1] || "这一结果";
+  const relation = `${left}与${right}`;
+  return {
+    title: mechanism ? `${relation}关系的元分析：${mechanism}的作用` : `${relation}关系的元分析`,
+    relation,
+    studies: "报告了效应量的实证研究",
+    scope: "2021 年以来的中英文期刊",
+    extract: mechanism ? `效应量、样本量，以及${mechanism}的测法` : "效应量、样本量与测法",
+  };
+}
+
+export type TextMaterial = {
+  title: string;
+  name: string;
+  kind: string;
+  scope: string;
+  part: string;
+};
+
+/** 文本分析要一份可以逐条摘录的文本。已是文本题的沿用原文；其余改成记录、年报或公开文本。 */
+export function textMaterial(example: HomeExample): TextMaterial {
+  if (example.text) {
+    return { title: example.title, name: example.where, kind: example.who, scope: example.stage, part: example.condition };
+  }
+  const { dv, mechanism } = effectParts(example);
+  const phenomenon = clip(mechanism || dv || example.keywords[1] || "这一现象", 12);
+  const blob = `${example.where}${example.who}${example.keywords.join("")}${example.condition}${example.title}`;
+  const material = pickText(example, blob);
+  const part = clip(mechanism && dv ? `${dv}与${mechanism}的相关部分` : material.part, 30);
+  return {
+    title: `${material.name}中${phenomenon}的内容分析`,
+    name: material.name,
+    kind: material.kind,
+    scope: material.scope,
+    part,
+  };
+}
+
+function qualitativeTitle(example: HomeExample): string {
+  const who = example.who || "当事人";
+  const { iv, dv, mechanism } = effectParts(example);
+  if (iv && dv) return `${iv}如何形塑${who}的${dv}${mechanism ? `：${mechanism}的视角` : ""}`;
+  return `${who}如何经历和理解这件事`;
+}
+
+function effectParts(example: HomeExample): { iv: string; dv: string; mechanism: string } {
+  const stripped = example.title.replace(/^[^：]{1,20}：(?=.+的影响)/, "");
+  const matched = stripped.match(/^(.+?)对(.+?)的影响(?:：(.+?)的(?:中介|调节)作用)?$/);
+  if (!matched) {
+    const [first, second, third] = example.keywords;
+    return { iv: first || "", dv: second || "", mechanism: third || "" };
+  }
+  const iv = matched[1] ?? "";
+  const middle = matched[2] ?? "";
+  const mechanism = matched[3] ?? "";
+  const dv = example.keywords.find((word) => word && word !== iv && middle.includes(word)) || middle;
+  return { iv, dv, mechanism };
+}
+
+function pickText(example: HomeExample, blob: string): { name: string; kind: string; scope: string; part: string } {
+  if (/实验记录|实验|实验室|规程|台架|辐射/.test(blob)) {
+    return { name: book(`${clip(example.where, 12)}实验记录`), kind: "实验记录", scope: "一次课程实验", part: "规程与记录页" };
+  }
+  if (/病历|医师|医院|护理|门诊|药/.test(blob)) {
+    return { name: "《一份教学病历》", kind: "病历文本", scope: "教学用脱敏病历", part: "病程记录" };
+  }
+  if (/新闻|报道|短视频|报纸|媒体/.test(blob)) {
+    return { name: book(`${clip(example.where, 10)}相关报道`), kind: "新闻报道", scope: "一个栏目的样本", part: "正文" };
+  }
+  if (/政策|条例|办法|财政|预算|政务|法院|街道|社区/.test(blob)) {
+    return { name: book(`${clip(example.where, 10)}相关办法`), kind: "政策文本", scope: "现行有效版本", part: "正文" };
+  }
+  if (/企业|公司|车间|研发|融资|年报/.test(blob)) {
+    const place = example.where.replace(/企业$/, "") || example.where;
+    return { name: book(`${clip(place, 12)}企业年报`), kind: "企业年报", scope: "最近一个会计年度", part: "相关附注" };
+  }
+  if (/学生|高校|课程|本科|学员|课堂|大学/.test(blob)) {
+    return { name: book(`${clip(example.keywords[0] || "课程", 8)}课程材料`), kind: "课程文本", scope: "一个学期", part: "正文" };
+  }
+  return { name: book(`${clip(example.keywords[0] || example.where, 10)}相关文本`), kind: "公开文本", scope: "一个可核对的版本", part: "正文" };
+}
+
+function book(inner: string) {
+  return `《${clip(inner, 26)}》`;
+}
+
+function clip(value: string, max: number) {
+  return [...value].slice(0, max).join("");
 }

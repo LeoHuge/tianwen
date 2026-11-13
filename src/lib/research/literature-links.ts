@@ -50,8 +50,8 @@ export function literatureLinks(keywords: string[]): LiteratureLink[] {
     {
       id: "nssfc",
       name: "国家社科基金",
-      note: "打开后按项目名称检索",
-      href: "https://fz.people.com.cn/skygb/sk/index.php/Index/seach",
+      note: "国家社科基金项目数据库",
+      href: `https://fz.people.com.cn/skygb/sk/index.php/Index/seach?xmname=${encodeURIComponent(keywords[0]?.trim() || query)}&p=1`,
     },
   ];
 }

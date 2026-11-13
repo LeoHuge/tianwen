@@ -1,4 +1,5 @@
-import { interviewCriteria, screeningQuestions } from "./subject";
+import { interviewCriteria, screeningQuestions, textObject } from "./subject";
+import { textParadigm } from "./text-paradigms";
 import { effectivePattern } from "./topic-parts";
 import type { SubjectParts, TopicParts } from "./types";
 
@@ -34,7 +35,7 @@ export type InstrumentSection = {
 export type CodebookRow = { variable: string; name: string; items: string; coding: string };
 
 export type Instrument = {
-  kind: "scale" | "interview";
+  kind: "scale" | "interview" | "text" | "meta";
   title: string;
   intro: string;
   sections: InstrumentSection[];
@@ -48,7 +49,7 @@ export type Instrument = {
 };
 
 export type InstrumentSeed = {
-  kind: "scale" | "interview";
+  kind: "scale" | "interview" | "text" | "meta";
   title: string;
   question: string;
   parts: TopicParts;
@@ -417,6 +418,8 @@ function aiFor(variable: { name: string }, constructs: AiConstruct[]) {
 }
 
 export function buildInstrument(seed: InstrumentSeed, ai?: AiInstrumentPart | null): Instrument {
+  if (seed.kind === "meta") return assembleMeta(seed);
+  if (seed.kind === "text") return assembleText(seed);
   if (seed.kind === "interview") {
     const modules = ai && ai.kind === "interview" && ai.modules.length >= 2 ? ai.modules : ruleModules(seed);
     return assembleInterview(seed, modules, ai && ai.kind === "interview" && ai.modules.length >= 2 ? "model" : "rules");
@@ -880,6 +883,123 @@ function assembleInterview(seed: InstrumentSeed, modules: AiModule[], source: "r
   };
 }
 
+function assembleMeta(seed: InstrumentSeed): Instrument {
+  const relation = [seed.parts.iv, seed.parts.dv].filter((item) => item.trim()).join("与") || seed.parts.object || "这一关系";
+  const mechanism = seed.parts.mechanism.trim();
+  const scope = [seed.subject.stage, seed.subject.condition].map((item) => item.trim()).filter(Boolean).join("，");
+  return {
+    kind: "meta",
+    title: `${relation}关系的摘录表`,
+    intro: "这份表登记已经发表的研究。效应量、样本量和标准误从原文抄录。合并效应、异质性和发表偏倚在摘录完成之后计算。",
+    sections: [
+      {
+        id: "scope",
+        title: "一、检索与纳入",
+        role: "record",
+        purpose: "先写检索式和纳入标准，再开始摘录。",
+        items: [
+          { code: "", text: `研究关系：${relation}`, kind: "note" },
+          { code: "", text: `纳入：${seed.subject.who.trim() || "报告了效应量的实证研究"}`, kind: "note" },
+          { code: "", text: `检索范围：${scope || "写明数据库、年份和语种。"}`, kind: "note" },
+          { code: "", text: seed.subject.exclude.trim() ? `不纳入：${seed.subject.exclude.trim()}` : "不纳入：未报告效应量的评论和社论。", kind: "note" },
+        ],
+      },
+      {
+        id: "columns",
+        title: "二、每项研究摘录这些列",
+        role: "module",
+        purpose: "一行一项研究。格子先空着，检索完成后再填。",
+        items: [
+          { code: "M1", text: "作者与年份。", kind: "note" },
+          { code: "M2", text: "效应量及其类型（r、d、OR 或回归系数）。", kind: "note" },
+          { code: "M3", text: "标准误或可用于换算标准误的统计量，以及样本量。", kind: "note" },
+          { code: "M4", text: `${seed.parts.iv || "自变量"}和${seed.parts.dv || "因变量"}的测法。`, kind: "note" },
+          { code: "M5", text: mechanism ? `${mechanism}是否被测量，以及如何测量。` : "设计类型与是否有控制变量。", kind: "note" },
+        ],
+      },
+    ],
+    codebook: [
+      { variable: "来源", name: "作者与年份", items: "题录", coding: "按原文题录填写。" },
+      { variable: "效应", name: "效应量", items: "原文报告的统计量", coding: "只抄原文，不换算成合并效应。" },
+      { variable: "精度", name: "标准误与样本量", items: "原文", coding: "缺标准误时记下原文给了什么，不编一个数。" },
+    ],
+    quality: ["两名摘录者独立填表，不一致的格子回到原文核对。", "没有效应量的研究记入排除理由，不估一个效应。"],
+    pilot: ["先用 5 项研究试摘录，看列是否够用，再改表头。试摘录可以计入正式表。"],
+    analysis: ["摘录完成前不计算合并效应、I² 或发表偏倚。计算时按 Borenstein 等（2009）说明效应量如何换算，并按 PRISMA 2020 报告检索过程。"],
+    minutes: 0,
+    source: "rules",
+    notes: ["这是元分析的摘录表，不是问卷，也不是单份文本的分类框架。"],
+  };
+}
+
+function assembleText(seed: InstrumentSeed): Instrument {
+  const guide = textParadigm(seed.pattern);
+  const text = textObject(seed.subject) || seed.parts.object || "这份文本";
+  const phenomenon = seed.parts.dv || "分析现象";
+  const lens = seed.parts.iv || guide.lens || guide.mark;
+  const scope = [seed.subject.stage, seed.subject.condition].map((item) => item.trim()).filter(Boolean).join("，");
+  return {
+    kind: "text",
+    title: `${lens}：${text}中${phenomenon}的分析框架`,
+    intro: `这份框架用于分析一份文本。先划定${text}，再把${phenomenon}逐条抽出，归入下面的类目，并用${lens}解释。类目可以合并。看完材料之后，不再临时增加刚好能得出预定结论的类目。`,
+    sections: [
+      {
+        id: "scope",
+        title: "一、文本范围",
+        role: "record",
+        purpose: "先写死分析哪一份文本，再开始摘录。",
+        items: [
+          { code: "", text: `文本：${text}${seed.subject.who.trim() ? `（${seed.subject.who.trim()}）` : ""}`, kind: "note" },
+          { code: "", text: `版本与范围：${scope || "写明版本、章节或集数，以及不纳入的部分。"}`, kind: "note" },
+          { code: "", text: seed.subject.exclude.trim() ? `不纳入：${seed.subject.exclude.trim()}` : "不纳入：按上面的范围，没有额外排除。", kind: "note" },
+          { code: "", text: `分析单位：${guide.unit}`, kind: "note" },
+        ],
+      },
+      {
+        id: "lens",
+        title: "二、理论视角",
+        role: "module",
+        purpose: guide.work,
+        definition: guide.work,
+        reference: guide.cite,
+        items: [{ code: "", text: `本框架使用${guide.label}。${guide.work}`, kind: "note" }],
+      },
+      {
+        id: "codes",
+        title: "三、类目",
+        role: "module",
+        purpose: "每一条摘录只归入一个主类目。归不进去的先放「待定」，集中修订类目说明，不逐条改定义。",
+        items: guide.cats.map((cat, index) => ({
+          code: `C${index + 1}`,
+          text: `${cat}。判定规则：写明什么样的条目归入此类，什么样的不归。`,
+          kind: "note" as const,
+        })),
+      },
+    ],
+    codebook: guide.cats.map((cat, index) => ({
+      variable: `C${index + 1}`,
+      name: cat,
+      items: phenomenon,
+      coding: "1 = 归入；0 = 不归入。一条摘录只标一个主类。",
+    })),
+    quality: [
+      "摘录必须能回到原文的位置：页码、时间码或段落。",
+      "两名编码者先独立归类同一批条目，再对照差异，修订类目说明。",
+      "若报告数量，用 Cohen's κ 写编码一致性。κ 不是问卷的 Cronbach's α。",
+      "解释必须能指回某一条摘录。没有摘录支撑的判断不写入结果。",
+    ],
+    pilot: ["先抽约 20 条试编码。类目边界不清楚就改说明，再进入全文。", "试编码改过类目的，不把试编码的归类直接当作结果。"],
+    analysis: [
+      `按${guide.label}：确定文本范围 → 抽取${phenomenon} → 归入类目 → 用理论解释每一类为什么这样出现。`,
+      "可以报告每一类有多少条。这是文本内部的计数，不是对一群人的抽样推断。",
+      guide.work,
+    ],
+    minutes: 0,
+    source: "rules",
+    notes: ["这是文本分析的分类框架，不是问卷，也不是访谈提纲。"],
+  };
+}
+
 // ---------- 导出 ----------
 
 function optionsText(item: InstrumentItem) {
@@ -890,9 +1010,17 @@ function optionsText(item: InstrumentItem) {
   return "";
 }
 
+function docKindName(kind: Instrument["kind"]) {
+  if (kind === "text") return "文本分析框架";
+  if (kind === "meta") return "元分析摘录表";
+  if (kind === "interview") return "半结构访谈提纲";
+  return "调查问卷";
+}
+
 export function instrumentMarkdown(doc: Instrument) {
-  const lines: string[] = [`# ${doc.title}`, "", `${doc.kind === "scale" ? "调查问卷" : "半结构访谈提纲"} · 预计 ${doc.minutes} 分钟`, ""];
-  lines.push(doc.kind === "scale" ? "## 卷首语" : "## 开场白（照读）", "", ...doc.intro.split("\n").map((line) => `${line}  `), "");
+  const lines: string[] = [`# ${doc.title}`, "", doc.kind === "text" ? docKindName(doc.kind) : `${docKindName(doc.kind)} · 预计 ${doc.minutes} 分钟`, ""];
+  const intro = doc.kind === "scale" ? "## 卷首语" : doc.kind === "interview" ? "## 开场白（照读）" : "## 使用说明";
+  lines.push(intro, "", ...doc.intro.split("\n").map((line) => `${line}  `), "");
   for (const section of doc.sections) {
     lines.push(`## ${section.title}`, "", `*${section.purpose}*`, "");
     if (section.definition) lines.push(`**操作化定义**：${section.definition}`, "");
@@ -912,10 +1040,10 @@ export function instrumentMarkdown(doc: Instrument) {
     }
     lines.push("");
   }
-  lines.push(doc.kind === "scale" ? "## 变量与题项对照表" : "## 初始编码框架", "", "| 变量 | 名称 | 题项 | 编码 |", "| --- | --- | --- | --- |");
+  lines.push(doc.kind === "scale" ? "## 变量与题项对照表" : doc.kind === "text" ? "## 类目与编码说明" : "## 初始编码框架", "", "| 变量 | 名称 | 题项 | 编码 |", "| --- | --- | --- | --- |");
   for (const row of doc.codebook) lines.push(`| ${row.variable} | ${row.name} | ${row.items} | ${row.coding} |`);
   lines.push("", "## 质量控制", "", ...doc.quality.map((line) => `- ${line}`), "");
-  lines.push(doc.kind === "scale" ? "## 预调查" : "## 预访谈", "", ...doc.pilot.map((line) => `- ${line}`), "");
+  lines.push(doc.kind === "scale" ? "## 预调查" : doc.kind === "text" ? "## 试编码" : "## 预访谈", "", ...doc.pilot.map((line) => `- ${line}`), "");
   lines.push("## 分析计划", "", ...doc.analysis.map((line) => `- ${line}`), "");
   return lines.join("\n");
 }
@@ -926,7 +1054,10 @@ function escapeHtml(text: string) {
 
 /** Word 能直接打开的 HTML，另存为 .doc 即可编辑。 */
 export function instrumentWordHtml(doc: Instrument, extra = "") {
-  const body: string[] = [`<h1>${escapeHtml(doc.title)}</h1>`, `<p class="meta">${doc.kind === "scale" ? "调查问卷" : "半结构访谈提纲"} · 预计 ${doc.minutes} 分钟</p>`];
+  const body: string[] = [
+    `<h1>${escapeHtml(doc.title)}</h1>`,
+    `<p class="meta">${escapeHtml(docKindName(doc.kind))}${doc.kind === "text" ? "" : ` · 预计 ${doc.minutes} 分钟`}</p>`,
+  ];
   body.push(`<div class="intro">${doc.intro.split("\n").map((line) => `<p>${escapeHtml(line)}</p>`).join("")}</div>`);
   for (const section of doc.sections) {
     body.push(`<h2>${escapeHtml(section.title)}</h2>`, `<p class="purpose">${escapeHtml(section.purpose)}</p>`);
@@ -957,7 +1088,7 @@ export function instrumentWordHtml(doc: Instrument, extra = "") {
       if (item.probes?.length) body.push(`<ul>${item.probes.map((probe) => `<li>追问：${escapeHtml(probe)}</li>`).join("")}</ul>`);
     }
   }
-  body.push(`<h2>${doc.kind === "scale" ? "变量与题项对照表" : "初始编码框架"}</h2>`);
+  body.push(`<h2>${doc.kind === "scale" ? "变量与题项对照表" : doc.kind === "text" ? "类目与编码说明" : "初始编码框架"}</h2>`);
   body.push(
     `<table><tr><th>变量</th><th>名称</th><th>题项</th><th>编码</th></tr>${doc.codebook
       .map((row) => `<tr><td>${escapeHtml(row.variable)}</td><td>${escapeHtml(row.name)}</td><td>${escapeHtml(row.items)}</td><td>${escapeHtml(row.coding)}</td></tr>`)
@@ -965,7 +1096,7 @@ export function instrumentWordHtml(doc: Instrument, extra = "") {
   );
   for (const [heading, list] of [
     ["质量控制", doc.quality],
-    [doc.kind === "scale" ? "预调查" : "预访谈", doc.pilot],
+    [doc.kind === "scale" ? "预调查" : doc.kind === "text" ? "试编码" : "预访谈", doc.pilot],
     ["分析计划", doc.analysis],
   ] as const) {
     body.push(`<h2>${heading}</h2><ul>${list.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}</ul>`);
@@ -980,6 +1111,7 @@ export function instrumentWordHtml(doc: Instrument, extra = "") {
 
 export function constructSummary(doc: Instrument | null) {
   if (!doc) return "";
+  if (doc.kind === "text") return doc.codebook.map((row) => row.name).join("、");
   if (doc.kind === "interview") {
     return doc.sections
       .filter((section) => section.role === "module")

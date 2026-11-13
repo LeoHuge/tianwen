@@ -15,14 +15,14 @@ export function Poster() {
         <div className="poster-title">
           <span>开</span>
           <span>题</span>
+          <span className="poster-sheen" />
         </div>
         <span className="poster-rule" />
       </div>
       <div className="poster-foot">
         <p className="poster-line">写成一份可以实施的开题</p>
         <p className="poster-meta">
-          <span>检索免费</span>
-          <span>看题 ¥199</span>
+          <span>从此开题</span>
         </p>
       </div>
     </div>

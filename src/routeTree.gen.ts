@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BroughtRouteImport } from './routes/brought'
 import { Route as CodeRouteImport } from './routes/code'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PricingRouteImport } from './routes/pricing'
@@ -19,6 +20,11 @@ import { Route as StudioRouteImport } from './routes/studio'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BroughtRoute = BroughtRouteImport.update({
+  id: '/brought',
+  path: '/brought',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CodeRoute = CodeRouteImport.update({
@@ -49,6 +55,7 @@ const StudioRoute = StudioRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/brought': typeof BroughtRoute
   '/code': typeof CodeRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/brought': typeof BroughtRoute
   '/code': typeof CodeRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/brought': typeof BroughtRoute
   '/code': typeof CodeRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
@@ -74,14 +83,24 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/code' | '/orders' | '/pricing' | '/risks' | '/studio'
+  fullPaths:
+    '/' | '/brought' | '/code' | '/orders' | '/pricing' | '/risks' | '/studio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/code' | '/orders' | '/pricing' | '/risks' | '/studio'
-  id: '__root__' | '/' | '/code' | '/orders' | '/pricing' | '/risks' | '/studio'
+  to: '/' | '/brought' | '/code' | '/orders' | '/pricing' | '/risks' | '/studio'
+  id:
+    | '__root__'
+    | '/'
+    | '/brought'
+    | '/code'
+    | '/orders'
+    | '/pricing'
+    | '/risks'
+    | '/studio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BroughtRoute: typeof BroughtRoute
   CodeRoute: typeof CodeRoute
   OrdersRoute: typeof OrdersRoute
   PricingRoute: typeof PricingRoute
@@ -96,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/brought': {
+      id: '/brought'
+      path: '/brought'
+      fullPath: '/brought'
+      preLoaderRoute: typeof BroughtRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/code': {
@@ -138,6 +164,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BroughtRoute: BroughtRoute,
   CodeRoute: CodeRoute,
   OrdersRoute: OrdersRoute,
   PricingRoute: PricingRoute,

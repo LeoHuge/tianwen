@@ -5,6 +5,7 @@ dist/
 .nitro/
 .env
 .env.*
+.xai-key
 *.log
 .DS_Store
 Thumbs.db

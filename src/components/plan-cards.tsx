@@ -23,7 +23,7 @@ export function PlanCards({
               <p className="text-xs text-brass">{plan.eyebrow}</p>
               <h3 className="mt-1 text-2xl">{plan.name}</h3>
             </div>
-            {plan.recommended ? <span className="bg-ink px-2 py-1 text-xs text-on-cinnabar">多数人选</span> : null}
+            {plan.recommended ? <span className="bg-ink px-2 py-1 text-xs text-on-cinnabar">含三轮修订</span> : null}
           </div>
           <p className="mt-3 font-serif text-4xl tabular-nums">{yuan(plan.price)}</p>
           <p className="mt-3 text-sm text-ink-soft">{plan.summary}</p>
@@ -36,7 +36,7 @@ export function PlanCards({
           </ul>
           <p className="mt-4 text-xs text-brass">{plan.revisions}</p>
           <Button className="mt-4" tone={plan.recommended ? "primary" : "ink"} onClick={() => onBuy(plan.id)}>
-            {isStaticPreview() ? "点击解锁" : "扫码购买（演示）"}
+            {isStaticPreview() ? "查看并确认" : "前往确认"}
           </Button>
         </article>
       ))}

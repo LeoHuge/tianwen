@@ -42,9 +42,9 @@ export function PayDialog({
   useEffect(() => {
     if (!order) return;
     let cancel = false;
-    const payload = `天问演示订单，不会扣款。单号 ${order.id}，金额 ${order.amount} 元，渠道 ${
+    const payload = `天问开题订单说明。单号 ${order.id}，金额 ${order.amount} 元，渠道 ${
       order.channel === "wechat" ? "微信" : "支付宝"
-    }。正式环境请使用商户平台返回的支付链接。`;
+    }。此码用于核对流程，不发起扣款。`;
     void QRCode.toDataURL(payload, {
       margin: 1,
       width: 280,
@@ -66,9 +66,9 @@ export function PayDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/45 backdrop-blur-[2px]" />
         <Dialog.Content className="sheet fixed top-1/2 left-1/2 z-50 max-h-[90vh] w-[min(100%-2rem,28rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-6">
-          <Dialog.Title className="font-serif text-2xl text-ink">{preview ? "点击解锁" : "扫码支付 · 演示"}</Dialog.Title>
+          <Dialog.Title className="font-serif text-2xl text-ink">确认订单</Dialog.Title>
           <Dialog.Description className="mt-1 text-sm text-muted">
-            {plan.name} · {yuan(plan.price)}。{preview ? "公开预览不会扣款，点一下即解锁，只记在这台浏览器。" : "此码不会发起真实扣款。"}
+            {plan.name} · {yuan(plan.price)}。确认后即可查看。记录保存在这台浏览器，不发生扣款。
           </Dialog.Description>
           {note ? <p className="mt-2 text-sm text-ink-soft">{note}</p> : null}
           {preview ? null : (
@@ -89,15 +89,15 @@ export function PayDialog({
                 ))}
               </div>
               <div className="mt-4 flex flex-col items-center border border-line bg-paper p-4">
-                {src ? <img src={src} alt="演示订单二维码" className="size-52" /> : <div className="size-52" />}
-                <p className="mt-2 text-center text-xs text-muted">单号 {order.id} · 扫出来也只是一段说明文字</p>
+                {src ? <img src={src} alt="订单二维码" className="size-52" /> : <div className="size-52" />}
+                <p className="mt-2 text-center text-xs text-muted">单号 {order.id}</p>
               </div>
             </>
           )}
           <p className="mt-3 text-xs text-brass">
             {preview
-              ? "记录存在这台浏览器。换浏览器、清站点数据后需要重新点击解锁。"
-              : "生成前可放弃。模拟到账后，数字内容按购买页的规则视为已交付演示权益，换浏览器不会保留。"}
+              ? "记录保存在这台浏览器。更换浏览器或清除站点数据后，需要重新确认。"
+              : "内容生成前可以放弃。确认后，记录保存在这台浏览器。"}
           </p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Button
@@ -109,11 +109,11 @@ export function PayDialog({
                 if (plan.id === "code") void navigate({ to: "/code" });
               }}
             >
-              {preview ? "点击解锁" : "模拟到账，解锁"}
+              确认并查看
             </Button>
             <Dialog.Close asChild>
               <Button tone="ghost" className="flex-1">
-                先不付
+                稍后再说
               </Button>
             </Dialog.Close>
           </div>

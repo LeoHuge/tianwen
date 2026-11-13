@@ -1,4 +1,4 @@
-import type { SubjectParts } from "./types";
+import type { Paradigm, SubjectParts } from "./types";
 
 export type SubjectSlot = {
   key: keyof SubjectParts;
@@ -100,7 +100,9 @@ function glue(left: string, right: string) {
   return isAscii(a) !== isAscii(b) && a !== " " && b !== " " ? `${left} ${right}` : left + right;
 }
 
-export function subjectSentence(parts: SubjectParts, withTail = true) {
+export function subjectSentence(parts: SubjectParts, withTail = true, paradigm: "" | Paradigm = "") {
+  if (paradigm === "文本分析") return textSentence(parts, withTail);
+  if (paradigm === "元分析") return metaSentence(parts);
   const where = t(parts.where);
   const who = t(parts.who);
   const quals = [t(parts.stage), t(parts.condition)].filter(Boolean).join("、");
@@ -124,6 +126,22 @@ export function shortObject(parts: SubjectParts) {
   return who;
 }
 
+function textSentence(parts: SubjectParts, withTail: boolean) {
+  const name = t(parts.where);
+  const kind = t(parts.who);
+  const head = [name, kind].filter(Boolean).join(" · ");
+  const scope = [t(parts.stage), t(parts.condition)].filter(Boolean).join("，");
+  if (!head && !scope) return "";
+  let sentence = scope && head ? `${head}（${scope}）` : head || scope;
+  const tail = [t(parts.time), t(parts.exclude) ? `不纳入${t(parts.exclude)}` : ""].filter(Boolean);
+  return withTail && tail.length ? `${sentence}（${tail.join("；")}）` : sentence;
+}
+
+/** 放进题目的文本名称。 */
+export function textObject(parts: SubjectParts) {
+  return t(parts.where) || t(parts.who);
+}
+
 /** 放进题目的研究对象：地点加人群，短条件也带上。 */
 export function titleObject(parts: SubjectParts) {
   const where = t(parts.where);
@@ -141,7 +159,9 @@ export type SubjectCheck = {
   filled: Record<keyof SubjectParts, boolean>;
 };
 
-export function checkSubject(parts: SubjectParts): SubjectCheck {
+export function checkSubject(parts: SubjectParts, paradigm: "" | Paradigm = ""): SubjectCheck {
+  if (paradigm === "文本分析") return checkText(parts);
+  if (paradigm === "元分析") return checkMeta(parts);
   const where = t(parts.where);
   const who = t(parts.who);
   const stage = t(parts.stage);
@@ -173,6 +193,103 @@ export function checkSubject(parts: SubjectParts): SubjectCheck {
     },
   };
 }
+
+function checkText(parts: SubjectParts): SubjectCheck {
+  const where = t(parts.where);
+  const who = t(parts.who);
+  const stage = t(parts.stage);
+  const condition = t(parts.condition);
+  const missing: string[] = [];
+  const problems: string[] = [];
+  const warnings: string[] = [];
+  if (!where) missing.push("文本名称");
+  if (!who) missing.push("文本类型");
+  if (!stage && !condition) missing.push("版本/范围，或纳入哪一部分，至少写一个");
+  if (where && TOO_WIDE.test(where)) problems.push(`「${where}」不是一份文本。写明作品、报纸、文件的名称。`);
+  if (where && where.length < 2) problems.push("文本名称写完整。");
+  if (who && VARIABLE_END.test(who)) problems.push(`「${who}」像是要分析的现象，放进关键词。文本类型写「电影字幕」「社论」「条例」。`);
+  return {
+    ok: missing.length === 0 && problems.length === 0,
+    sentence: textSentence(parts, true),
+    missing,
+    problems,
+    warnings,
+    filled: {
+      where: Boolean(where),
+      who: Boolean(who),
+      stage: Boolean(stage),
+      condition: Boolean(condition),
+      time: Boolean(t(parts.time)),
+      exclude: Boolean(t(parts.exclude)),
+    },
+  };
+}
+
+function metaSentence(parts: SubjectParts) {
+  const relation = t(parts.where);
+  const studies = t(parts.who);
+  const scope = t(parts.stage);
+  const extract = t(parts.condition);
+  if (!relation && !studies && !scope && !extract) return "";
+  const bits = [relation ? `看${relation}` : "", studies ? `纳入${studies}` : "", scope ? `检索${scope}` : "", extract ? `摘录${extract}` : ""].filter(Boolean);
+  return bits.join("。");
+}
+
+function checkMeta(parts: SubjectParts): SubjectCheck {
+  const where = t(parts.where);
+  const who = t(parts.who);
+  const stage = t(parts.stage);
+  const condition = t(parts.condition);
+  const missing: string[] = [];
+  if (!where) missing.push("研究关系");
+  if (!who) missing.push("纳入的研究");
+  if (!stage && !condition) missing.push("检索范围，或必须摘录的内容，至少写一个");
+  return {
+    ok: missing.length === 0,
+    sentence: metaSentence(parts),
+    missing,
+    problems: [],
+    warnings: [],
+    filled: {
+      where: Boolean(where),
+      who: Boolean(who),
+      stage: Boolean(stage),
+      condition: Boolean(condition),
+      time: Boolean(t(parts.time)),
+      exclude: Boolean(t(parts.exclude)),
+    },
+  };
+}
+
+export const META_SLOTS: SubjectSlot[] = [
+  { key: "where", label: "研究关系", need: "must", placeholder: "契约环境与研发投入", hint: "写要综合的那一对变量。这里不写人群。" },
+  { key: "who", label: "纳入的研究", need: "must", placeholder: "报告了效应量的实证研究", hint: "分析单位是一项已发表的研究。" },
+  { key: "stage", label: "检索范围", need: "one", placeholder: "2021 年以来的中英文期刊", hint: "写数据库、年份和语种。" },
+  { key: "condition", label: "必须摘录", need: "one", placeholder: "效应量、样本量与测法", hint: "原文没有的数字不要补。" },
+  { key: "time", label: "检索日期（选填）", need: "optional", placeholder: "检索当天的日期", hint: "" },
+  { key: "exclude", label: "不纳入（选填）", need: "optional", placeholder: "未报告效应量的评论", hint: "综述、社论、没有效应量的定性研究。" },
+];
+
+export const TEXT_SLOTS: SubjectSlot[] = [
+  { key: "where", label: "文本名称", need: "must", placeholder: "《青春变形记》中文字幕", hint: "写作品名，并写明用的是字幕、正文还是译本。" },
+  { key: "who", label: "文本类型", need: "must", placeholder: "电影字幕", hint: "字幕、小说、新闻、政策文本、广告。理论视角不要写在这里。" },
+  { key: "stage", label: "版本 / 范围", need: "one", placeholder: "大陆公映版", hint: "哪个译本、哪一版、哪一年的报纸。" },
+  { key: "condition", label: "纳入哪一部分", need: "one", placeholder: "全片对白字幕", hint: "全片，或第几集、哪一栏目。" },
+  { key: "time", label: "文本时间（选填）", need: "optional", placeholder: "2022 年上映", hint: "" },
+  { key: "exclude", label: "不纳入（选填）", need: "optional", placeholder: "歌曲字幕、片尾名单", hint: "空着就按上一格全部纳入。" },
+];
+
+export const TEXT_EXAMPLES: { label: string; parts: SubjectParts }[] = [
+  { label: "电影字幕", parts: { where: "《青春变形记》中文字幕", who: "电影字幕", stage: "大陆公映版", condition: "全片对白字幕", time: "2022 年上映", exclude: "歌曲字幕" } },
+  { label: "新闻报道", parts: { where: "《人民日报》头版", who: "新闻报道", stage: "2024 年", condition: "与人工智能相关的报道", time: "", exclude: "图片说明" } },
+  { label: "政策文本", parts: { where: "某市养老服务条例", who: "政策文本", stage: "现行有效版本", condition: "全文", time: "", exclude: "附件表格" } },
+];
+
+export const TEXT_MISTAKES: { bad: string; why: string; good: string }[] = [
+  { bad: "文化负载词", why: "这是要分析的现象，放进关键词。", good: "文本名称写《青春变形记》中文字幕，类型写电影字幕" },
+  { bad: "中国电影", why: "没有落到一份可以逐条摘录的文本。", good: "《青春变形记》中文字幕" },
+  { bad: "目的论", why: "理论视角在出题时选，不写进文本名称。", good: "《青春变形记》中文字幕" },
+];
 
 function placeVerb(unit: string) {
   if (/学校|班级/.test(unit)) return "就读";

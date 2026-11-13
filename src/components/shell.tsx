@@ -5,6 +5,7 @@ import { exampleProject } from "@/lib/research/example";
 import { useLedger } from "@/lib/research/store";
 
 const LINKS = [
+  { to: "/brought", label: "自带题目" },
   { to: "/pricing", label: "价格" },
   { to: "/risks", label: "学术规范" },
 ] as const;
@@ -34,7 +35,7 @@ function NavLinks() {
         看示例
       </button>
       <Link to="/orders" className="shrink-0 py-1 transition-colors hover:text-ink">
-        登录
+        订单
       </Link>
     </>
   );
@@ -56,11 +57,13 @@ export function Shell({ children, plain = false }: { children: ReactNode; plain?
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 border-b border-line/80 bg-paper/90 backdrop-blur-md">
         <div className="mx-auto max-w-[1200px] px-5 md:px-10">
-          <div className="flex h-16 items-center gap-4">
-            <Link to="/" className="flex shrink-0 items-center gap-2.5 text-ink">
-              <Mark className="size-8" />
-              <span className="font-serif text-lg tracking-wide">天问</span>
-              <span className="text-sm text-muted">开题</span>
+          <div className="flex min-h-[4.5rem] items-center gap-4 py-2">
+            <Link to="/" aria-label="天问开题" className="flex shrink-0 items-center gap-2.5 text-ink">
+              <Mark className="size-9" />
+              <span className="brand-words">
+                <span className="brand-tianwen">天问</span>
+                <span className="brand-kaiti">开题</span>
+              </span>
             </Link>
             <nav className="ml-auto hidden items-center gap-7 text-sm text-muted md:flex">
               <NavLinks />
@@ -79,17 +82,16 @@ export function Shell({ children, plain = false }: { children: ReactNode; plain?
         <footer className="border-t border-line">
           <div className="mx-auto flex max-w-[1200px] flex-col gap-4 px-5 py-12 text-sm leading-7 text-muted md:flex-row md:items-start md:justify-between md:px-10">
             <div>
-              <p className="font-serif text-base text-ink">天问开题</p>
-              <p className="mt-1">天问科技（备案主体待登记）</p>
+              <p className="brand-words compact" aria-label="天问开题">
+                <span className="brand-tianwen">天问</span>
+                <span className="brand-kaiti">开题</span>
+              </p>
+              <p className="mt-1">社会科学开题</p>
             </div>
             <p className="flex max-w-xl flex-wrap gap-x-5">
-              <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
-                京ICP备xxxxxxxx号
-              </a>
-              <span>所用模型：待登记后公示名称与编号</span>
-              <Link to="/risks">用户协议</Link>
-              <Link to="/risks">隐私政策</Link>
-              <Link to="/risks">投诉举报</Link>
+              <Link to="/risks">学术规范</Link>
+              <Link to="/pricing">价格</Link>
+              <Link to="/orders">订单</Link>
             </p>
           </div>
         </footer>

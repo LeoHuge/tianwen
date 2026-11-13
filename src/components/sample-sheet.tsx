@@ -60,7 +60,7 @@ export function SampleSheet({
   onChange,
 }: {
   plan: SamplePlan;
-  kind: "scale" | "interview";
+  kind: "scale" | "interview" | "text" | "meta";
   onChange: (next: SamplePlan) => void;
 }) {
   const plan = sanitize(rawPlan);
@@ -160,7 +160,7 @@ export function SampleSheet({
               </div>
             ) : null}
           </>
-        ) : (
+        ) : kind === "interview" ? (
           <div className="grid gap-4 sm:grid-cols-2">
             <NumberField
               label="要比较几类人（亚群体数 g）"
@@ -173,15 +173,32 @@ export function SampleSheet({
             <NumberField label="每类访谈数" hint="10+3 规则即 13；最少 6" value={rawPlan.perGroup} min={6} max={40} onChange={(value) => set({ perGroup: value })} />
             <NumberField label="预计爽约比例（%）" value={Math.round(plan.dropout * 100)} min={0} max={100} onChange={(value) => set({ dropout: value / 100 })} />
           </div>
+        ) : kind === "text" ? (
+          <NumberField
+            label="纳入几份文本"
+            hint="一部电影、一组字幕或一份政策文本算一份。这里填写的是材料范围。"
+            value={rawPlan.texts}
+            min={1}
+            max={30}
+            onChange={(value) => set({ texts: value })}
+          />
+        ) : (
+          <p className="text-sm leading-7 text-ink-soft">先写检索式和纳入标准。效应量从原文摘录，合并效应在摘录完成之后计算。</p>
         )}
       </div>
 
       <div className="border border-ink bg-paper p-5">
-        <p className="text-xs tracking-widest text-muted">至少</p>
-        <p className="mt-1 font-serif text-5xl tabular-nums text-ink">{result.target}</p>
-        <p className="text-sm text-ink-soft">{result.unit}</p>
+        {kind === "meta" ? (
+          <p className="mt-1 font-serif text-2xl text-ink">先检索，再摘录</p>
+        ) : (
+          <>
+            <p className="text-xs tracking-widest text-muted">至少</p>
+            <p className="mt-1 font-serif text-5xl tabular-nums text-ink">{result.target}</p>
+            <p className="text-sm text-ink-soft">{result.unit}</p>
+          </>
+        )}
         <p className="mt-3 text-base text-ink">{issueLabel(result)}</p>
-        <p className="mt-1 text-xs text-muted">由「{result.requiredBy}」决定。每一步都能用公式复算，不是拍脑袋的经验数。</p>
+        <p className="mt-1 text-xs text-muted">由「{result.requiredBy}」决定。每一步写出公式、代入和出处，可以复核。</p>
         <ol className="mt-5 space-y-4">
           {result.steps.map((step) => (
             <Step key={step.key} step={step} emphasis={step.label === result.requiredBy} />
@@ -204,7 +221,7 @@ export function SampleSheet({
           </Button>
         </div>
         <div className="mt-5 border-t border-line pt-4">
-          <p className="text-sm text-ink">参考文献（都是公开出版物，可以在图书馆或数据库核对）</p>
+          <p className="text-sm text-ink">参考文献</p>
           <ul className="mt-2 space-y-1 text-xs leading-6 text-ink-soft">
             {result.references.map((item) => (
               <li key={item}>{item}</li>
@@ -212,7 +229,11 @@ export function SampleSheet({
           </ul>
         </div>
         <p className="mt-4 text-xs leading-6 text-muted">
-          人数达到下限，只说明统计上够用，不等于样本有代表性，也不等于一定显著。代表性取决于怎么抽样。
+          {kind === "text"
+            ? "份数表示材料范围。两名编码者独立归类后，用 Cohen's κ 报告一致性，并在方法中写明计算过程。"
+            : kind === "meta"
+              ? "篇数和效应量在检索、摘录之后填写。合并效应在摘录完成之后计算。"
+              : "人数达到下限，说明按当前设计和功效可以估计。代表性取决于抽样方式。"}
         </p>
       </div>
     </div>

@@ -22,19 +22,19 @@ function CodePage() {
   return (
     <Shell>
       <article className="mx-auto max-w-2xl px-5 py-14">
-        <p className="text-sm text-muted">另外 {yuan(price)}，初稿里没有</p>
-        <h1 className="mt-3 text-3xl leading-snug">要跑软件，或要交编码表，买这里。</h1>
+        <p className="text-sm text-muted">统计代码 · {yuan(price)}</p>
+        <h1 className="mt-3 text-3xl leading-snug">Stata、R 与访谈编码表</h1>
         <div className="mt-6 space-y-4 text-base leading-8 text-ink-soft">
-          <p>付过定金和尾款，拿到的是初稿，不是这些文件。</p>
-          <p>做问卷，给的是 Stata 和 R。它们帮你读入表格、看缺失、做描述。回归那一行被注释掉了，里面没有现成的系数。</p>
-          <p>做访谈，给的是一张空编码表，外加方法里可以改写的几句话。主题和原话留着你填。期刊要的通常是这段说明，不是软件工程文件。</p>
-          <p>列名要按你的表改。Stata 和 NVivo 的许可证不在这个价钱里。</p>
+          <p>成稿包交付初稿。统计代码在本页单独提供。</p>
+          <p>问卷研究提供 Stata 与 R 脚本，用于读入表格、查看缺失和做描述。回归命令留作注释，系数在您的软件中计算。</p>
+          <p>访谈研究提供编码表和方法说明。主题与原话由您填写。期刊通常采用这段方法说明。</p>
+          <p>请按您的数据表修改变量名。Stata 与 NVivo 的许可不包含在本项费用中。</p>
         </div>
         <div className="mt-8">
           {ready && unlocked ? (
-            <p className="text-sm text-muted">这份浏览器已经解开脚本。</p>
+            <p className="text-sm text-muted">本机已可查看全文。</p>
           ) : (
-            <Button onClick={() => setOpen(true)}>{isStaticPreview() ? "点击解锁全文" : `付 ${yuan(price)}，看全文`}</Button>
+            <Button onClick={() => setOpen(true)}>{isStaticPreview() ? "查看全文" : `支付 ${yuan(price)}，查看全文`}</Button>
           )}
         </div>
         <div className="mt-10">

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { AiConstruct, AiInstrumentPart, AiModule } from "./instrument";
-import { CHAT_PREFERENCE, chatJson, modelChain, reason } from "./llm";
+import { CHAT_PREFERENCE, chatJson, modelChain } from "./llm";
+import { readXaiApiKey } from "./xai-key.server";
 import { effectivePattern } from "./topic-parts";
 import type { ComposeInput, Manuscript, Paradigm, TopicParts } from "./types";
 
@@ -47,7 +48,7 @@ function parseInstrument(input: unknown): InstrumentInput {
     title,
     question: text(data.question, 160),
     subject: text(data.subject, 160),
-    discipline: text(data.discipline, 20),
+    discipline: text(data.discipline, 40),
     parts: {
       object: text(parts.object, 30),
       iv: text(parts.iv, 30),
@@ -163,10 +164,10 @@ function readModules(raw: unknown): AiModule[] {
 export const composeInstrument = createServerFn({ method: "POST" })
   .validator((input: unknown) => parseInstrument(input))
   .handler(async ({ data }) => {
-    if (data.note && FABRICATE.test(data.note)) return { ok: false as const, error: "不能按这个意见改：涉及伪造结果或编造数据。" };
-    if (!allowCall()) return { ok: false as const, error: "这一小时的生成次数已满，先用已经生成的完整结构。" };
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) return { ok: false as const, error: "模型没有配置密钥，先用规则生成的完整版本。" };
+    if (data.note && FABRICATE.test(data.note)) return { ok: false as const, error: "这个意见涉及伪造结果或编造数据，无法按此修改。" };
+    if (!allowCall()) return { ok: false as const, error: "这一小时的生成次数已满。请稍后再试。当前完整结构仍然保留。" };
+    const apiKey = readXaiApiKey();
+    if (!apiKey) return { ok: false as const, error: "模型暂不可用。当前完整结构仍然保留。" };
     try {
       const models = await modelChain(apiKey, CHAT_PREFERENCE, undefined, "XAI_MODEL");
       const valid = (value: unknown) => (data.kind === "scale" ? readConstructs(value).length > 0 : readModules(value).length >= 2);
@@ -187,16 +188,16 @@ export const composeInstrument = createServerFn({ method: "POST" })
         data.kind === "scale" ? { kind: "scale", constructs: readConstructs(raw) } : { kind: "interview", modules: readModules(raw) };
       return { ok: true as const, part };
     } catch (error) {
-      return { ok: false as const, error: `模型这次没有写成（${reason(error)}），先用规则生成的完整版本。` };
+      return { ok: false as const, error: "题项暂未改写完成。当前完整结构仍然保留。" };
     }
   });
 
 export const composePack = createServerFn({ method: "POST" })
   .validator((input: unknown) => parseCompose(input))
   .handler(async ({ data }) => {
-    if (!allowCall()) return { ok: false as const, error: "这一小时的生成次数已满。请稍后再试，或先用规则底稿。" };
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) return { ok: false as const, error: "模型暂不可用。可以改用规则底稿，它不调用模型。" };
+    if (!allowCall()) return { ok: false as const, error: "这一小时的生成次数已满。请稍后再试。" };
+    const apiKey = readXaiApiKey();
+    if (!apiKey) return { ok: false as const, error: "模型暂不可用。初稿将按当前设计整理。" };
     try {
       const models = await modelChain(apiKey, CHAT_PREFERENCE, undefined, "XAI_MODEL");
       const { data: raw } = await chatJson({
@@ -221,7 +222,7 @@ export const composePack = createServerFn({ method: "POST" })
       }
       return { ok: true as const, manuscript, analysisPlan: String(record.analysisPlan ?? "").slice(0, 1200) };
     } catch (error) {
-      return { ok: false as const, error: `${reason(error)}。上面那版还在，可以再试一次。` };
+      return { ok: false as const, error: "这一次没有完成。上一版仍然保留，可以再试一次。" };
     }
   });
 
@@ -229,11 +230,11 @@ export const revisePack = createServerFn({ method: "POST" })
   .validator((input: unknown) => parseRevise(input))
   .handler(async ({ data }) => {
     if (FABRICATE.test(data.note)) {
-      return { ok: false as const, error: "不能按这个意见改：涉及伪造结果或编造数据。请只改结构，或填入你自己算出的数字。" };
+      return { ok: false as const, error: "这个意见涉及伪造结果或编造数据，无法按此修改。请修改结构，或填入您自己核算的数字。" };
     }
     if (!allowCall()) return { ok: false as const, error: "这一小时的生成次数已满。" };
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) return { ok: false as const, error: "模型暂不可用，这一轮没有被消耗。" };
+    const apiKey = readXaiApiKey();
+    if (!apiKey) return { ok: false as const, error: "模型暂不可用。这一轮修订尚未计入。" };
     try {
       const models = await modelChain(apiKey, CHAT_PREFERENCE, undefined, "XAI_MODEL");
       const { data: raw } = await chatJson({
@@ -246,7 +247,7 @@ export const revisePack = createServerFn({ method: "POST" })
             content: `这是一轮结构性修订。目标：${data.target}。意见：${data.note}
 研究要点：${data.brief}
 当前文稿 JSON：${JSON.stringify(data.manuscript)}
-请返回完整 JSON 文稿，键为 title, abstract, keywords, sections（heading, body）。保留【待核验】和待填结果，不要新增任何未提供的统计数字或文献。`,
+请返回完整 JSON 文稿，键为 title, abstract, keywords, sections（heading, body）。保留现有六节标题：引言与背景、文献综述、研究设计或文本与视角、测量与样本或类目与编码、结果分析、结论。引言不写文献，综述不编出处，结果分析不补数字，结论不超出结果。保留【待核验】和待填结果。`,
           },
         ],
         maxTokens: 6000,
@@ -257,7 +258,7 @@ export const revisePack = createServerFn({ method: "POST" })
       });
       return { ok: true as const, manuscript: asManuscript(raw as Record<string, unknown>, "model", ["修订未核对文献，也未重新计算统计量。"]) };
     } catch (error) {
-      return { ok: false as const, error: `${reason(error)}。这一轮没有被消耗。` };
+      return { ok: false as const, error: "这一次没有完成。这一轮修订尚未计入。" };
     }
   });
 
@@ -270,11 +271,19 @@ function composePrompt(input: ComposeInput) {
     `关键词：${input.keywords.join("、")}`,
     `研究对象：${input.subject}`,
     `研究单位：${input.unit}`,
-    `范式与工具：${input.paradigm === "定性" ? "定性，半结构访谈" : "定量，自编问卷"}，数据由研究者自己收集`,
+    `范式与工具：${input.paradigm === "文本分析" ? "文本分析，分类框架，材料是文本" : input.paradigm === "元分析" ? "元分析，摘录已发表研究的效应量，不计算合并效应" : input.paradigm === "定性" ? "定性，半结构访谈" : "定量，自编问卷"}，由研究者自己处理`,
     `测量：${input.measures || "（未写）"}`,
     `样本量（原样复述，不要改数字）：${input.sampleSentence}`,
     `已核算汇总：${input.statsSummary ?? "无。禁止写任何统计结果。"}`,
-    "manuscript.sections 必须是数组，正好六项，顺序与标题固定为：问题提出、研究设计、测量与样本、分析计划、结果（待填）、讨论与局限。每节 body 150–300 字。摘要不超过 200 字。",
+    input.paradigm === "文本分析"
+      ? "manuscript.sections 必须是数组，正好六项，顺序与标题固定为：引言与背景、文献综述、文本与视角、类目与编码、结果分析、结论。每节 body 150–300 字。摘要不超过 200 字。不要写成问卷或访谈。"
+      : input.paradigm === "元分析"
+        ? "manuscript.sections 必须是数组，正好六项，顺序与标题固定为：引言与背景、文献综述、检索与纳入、摘录、结果分析、结论。每节 body 150–300 字。摘要不超过 200 字。不要写成问卷、访谈或单份文本细读。结果分析不写合并效应、I² 或 p 值。"
+        : "manuscript.sections 必须是数组，正好六项，顺序与标题固定为：引言与背景、文献综述、研究设计、测量与样本、结果分析、结论。每节 body 150–300 字。摘要不超过 200 字。",
+    "引言与背景：用一个能指认的情境起笔，接着写本文能回答的缺口，最后一句是研究问题。不要用「随着……的发展」起笔，不要在引言里做文献综述。",
+    "文献综述：按论点写，不按国内、国外分栏。只能使用研究者已经提供的篇名及其主题、方法、变量、对象。没有条目就只写检索方向并标【待核验】。不得编作者、年份、篇名、期刊、DOI。",
+    "结果分析：没有已核算汇总时只写待填位置，不写系数、p 值、访谈原话、类目条数或例句。有汇总时只复述，横截面不写成因果。",
+    "结论：只回答引言里的问题。局限集中写一次。一个场所或一份文本不能写成全体。结果未填时不提前写出回答。",
     "需要引文献的地方只写检索方向并标【待核验】。",
     '只返回：{"manuscript":{"title":"","abstract":"","keywords":[],"sections":[{"heading":"","body":""}]},"analysisPlan":"","warnings":[]}',
   ].join("\n");
@@ -287,7 +296,7 @@ function parseCompose(input: unknown): ComposeInput {
   if (keywords.length < 4 || keywords.some((word) => word.length < 2)) throw new Error("关键词不完整");
   const title = clip(String(data.title ?? ""), 80);
   if (title.length < 6) throw new Error("还没有定下题目");
-  const paradigm: Paradigm = data.paradigm === "定性" ? "定性" : "定量";
+  const paradigm: Paradigm = data.paradigm === "定性" || data.paradigm === "文本分析" || data.paradigm === "元分析" ? data.paradigm : "定量";
   return {
     keywords,
     subject: clip(String(data.subject ?? ""), 200),

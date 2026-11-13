@@ -8,13 +8,13 @@ export function StatsPanel({ csv, demo }: { csv: string; demo: boolean }) {
     <div className="space-y-4">
       {demo ? (
         <p className="border border-cinnabar bg-paper px-3 py-2 text-sm text-cinnabar">
-          这是虚构的演示表，只为看界面。禁止写入论文，也不会交给模型。
+          此表为版式示例，数字不写入论文。
         </p>
       ) : null}
-      <p className="text-sm text-muted">
-        计算发生在这台浏览器里。点击生成时，默认不上传逐行原始记录。
-        {summary.rows > 0 && summary.rows < 40 ? " 行数很少时，即便只上传均值也可能认出个人，请谨慎勾选。" : ""}
-      </p>
+        <p className="text-sm text-muted">
+          描述统计在这台浏览器中计算。生成初稿时使用汇总，不上传逐行原始记录。
+          {summary.rows > 0 && summary.rows < 40 ? " 行数较少时，汇总也可能使人被认出，请确认后再使用。" : ""}
+        </p>
       {summary.warnings.map((warning) => (
         <p key={warning} className="text-sm text-brass">
           {warning}

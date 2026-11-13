@@ -1,7 +1,7 @@
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
 
-const FALLBACK_MESSAGE = "页面没有正常打开。刷新一次；若仍失败，回到首页重新进入工作台。";
+const FALLBACK_MESSAGE = "页面没有正常打开。请刷新一次；若仍未打开，请回到首页重新进入。";
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;

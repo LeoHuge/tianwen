@@ -14,7 +14,8 @@ import { LockedTopics, PartsChips, TopicCard, TopicEditDialog, TopicsReveal } fr
 import { composeInstrument, composePack, revisePack } from "@/lib/research/ai-fns";
 import { CONTRACTS, TOPIC_FEE, yuan } from "@/lib/research/catalog";
 import { exampleProject } from "@/lib/research/example";
-import { FIELDS, fieldsOf } from "@/lib/research/fields";
+import { DisciplineFields } from "@/components/discipline-fields";
+import { directionsOf } from "@/lib/research/fields";
 import { generateTopics, searchHot } from "@/lib/research/hot-fns";
 import {
   buildInstrument,
@@ -33,16 +34,21 @@ import { DEMO_CSV, readDataFile, statsSentence, summarizeCsv } from "@/lib/resea
 import { projectAccess, useLedger } from "@/lib/research/store";
 import { isStaticPreview } from "@/lib/research/static-preview";
 import { checkSubject, subjectSentence } from "@/lib/research/subject";
+import { TEXT_PARADIGMS } from "@/lib/research/text-paradigms";
 import { rulesCandidates } from "@/lib/research/topic-parts";
-import { BLANK_SUBJECT, DISCLOSURE, type Candidate, type HotHit, type Paradigm, type PlanId, type Project } from "@/lib/research/types";
+import { BLANK_SUBJECT, DISCLOSURE, instrumentKind, type Candidate, type HotHit, type Paradigm, type PlanId, type Project } from "@/lib/research/types";
 
 export const Route = createFileRoute("/studio")({ component: StudioPage });
 
 const UNITS = ["个人", "家庭", "社区", "村庄", "学校/班级", "企业/组织", "街道/乡镇", "其他"];
 const PARADIGMS: { id: Paradigm; label: string; note: string }[] = [
-  { id: "定量", label: "定量 · 问卷调查", note: "题目会写清自变量、因变量和中介或调节；之后出问卷和样本量计算书。" },
-  { id: "定性", label: "定性 · 半结构访谈", note: "题目会写清具体情境和要理解的过程；之后出访谈提纲和访谈人数计算。" },
+  { id: "定量", label: "定量 · 问卷调查", note: "题目写清自变量、因变量和中介或调节；之后出问卷和样本量计算书。" },
+  { id: "定性", label: "定性 · 半结构访谈", note: "题目写清具体情境和要理解的过程；之后出访谈提纲和访谈人数。" },
+  { id: "文本分析", label: "文本分析", note: "题目是理论视角、一份文本和要分析的现象。之后出分类框架和编码说明。" },
+  { id: "元分析", label: "元分析", note: "题目写一批已发表研究里的关系。之后出摘录表，不计算合并效应。" },
 ];
+
+const TEXT_UNITS = ["文本", "词条", "篇目", "镜头"];
 
 type Busy = "search" | "topic" | "instrument" | "model" | "revise" | "file" | null;
 
@@ -51,6 +57,9 @@ function briefKeyOf(project: Project) {
     project.keywords.map((word) => word.trim()).join("|"),
     JSON.stringify(project.subjectParts),
     project.unit,
+    project.track,
+    project.category,
+    project.branch,
     project.discipline,
     project.field,
     project.paradigm,
@@ -61,7 +70,7 @@ function seedOf(project: Project): InstrumentSeed | null {
   const topic = project.topic;
   if (!topic) return null;
   return {
-    kind: topic.paradigm === "定性" ? "interview" : "scale",
+    kind: instrumentKind(topic.paradigm),
     title: topic.title,
     question: topic.question,
     parts: topic.parts,
@@ -119,7 +128,7 @@ function StudioPage() {
   const access = projectAccess(orders, project.id);
   const tier = access.tier ?? project.tier;
   const contract = CONTRACTS[tier];
-  const subjectCheck = checkSubject(project.subjectParts);
+  const subjectCheck = checkSubject(project.subjectParts, project.paradigm);
   const vague = vagueKeywords(project.keywords);
   const briefIssue = briefProblem(project, vague, subjectCheck);
   const briefKey = briefKeyOf(project);
@@ -128,7 +137,7 @@ function StudioPage() {
   const topicLocked = access.instrument;
   // 付过开题包且本项目已经出了题，题目依据的信息就锁定。
   const briefLocked = access.topic && project.candidates.length > 0;
-  const kind = project.paradigm === "定性" ? "interview" : "scale";
+  const kind = instrumentKind(project.paradigm);
   const sample = useMemo(() => computeSample(project.samplePlan, kind), [project.samplePlan, kind]);
   const summary = useMemo(() => summarizeCsv(project.csv), [project.csv]);
   const dataOk = summary.rows >= 5 && summary.columns.length >= 2;
@@ -162,19 +171,28 @@ function StudioPage() {
         keywords?: unknown[];
         subjectParts?: Record<string, unknown>;
         unit?: unknown;
+        track?: unknown;
+        category?: unknown;
+        branch?: unknown;
         discipline?: unknown;
         field?: unknown;
+        paradigm?: unknown;
       };
       if (!Array.isArray(brief.keywords)) return;
       const parts = { ...BLANK_SUBJECT };
       for (const key of Object.keys(parts) as (keyof typeof parts)[]) parts[key] = String(brief.subjectParts?.[key] ?? "");
+      const paradigm = brief.paradigm === "定量" || brief.paradigm === "定性" || brief.paradigm === "文本分析" ? brief.paradigm : "";
       patchProject({
         keywords: brief.keywords.map((word) => String(word)).slice(0, 4),
         subjectParts: parts,
-        subject: subjectSentence(parts),
+        subject: subjectSentence(parts, true, paradigm),
         unit: String(brief.unit ?? "社区"),
+        ...(brief.track === "本科" || brief.track === "研究生" ? { track: brief.track } : {}),
+        ...(typeof brief.category === "string" ? { category: brief.category } : {}),
+        ...(typeof brief.branch === "string" ? { branch: brief.branch } : {}),
         ...(typeof brief.discipline === "string" && brief.discipline ? { discipline: brief.discipline } : {}),
-        ...(typeof brief.field === "string" && brief.field ? { field: brief.field } : {}),
+        ...(typeof brief.field === "string" ? { field: brief.field } : {}),
+        ...(paradigm ? { paradigm, instrument: instrumentKind(paradigm) } : {}),
       });
     } catch {
       return;
@@ -191,10 +209,10 @@ function StudioPage() {
     if (current.instrumentKey === key && current.instrumentDoc) return;
     const base = buildInstrument(seed);
     patchProject({ instrumentDoc: base, instrumentKey: key, samplePlan: planWith(current.samplePlan, base) });
-    if (isStaticPreview()) return;
+    if (isStaticPreview() || seed.kind === "text" || seed.kind === "meta") return;
     setBusy("instrument");
     void writeInstrument({
-      data: { kind: seed.kind, title: seed.title, question: seed.question, subject: subjectSentence(seed.subject, false), discipline: seed.discipline, parts: seed.parts, pattern: seed.pattern, note: "" },
+      data: { kind: seed.kind, title: seed.title, question: seed.question, subject: subjectSentence(seed.subject, false, current.paradigm), discipline: seed.discipline, parts: seed.parts, pattern: seed.pattern, note: "" },
     })
       .then((result) => {
         if (useLedger.getState().project.instrumentKey !== key) return;
@@ -205,7 +223,7 @@ function StudioPage() {
         const next = buildInstrument(seed, result.part);
         patchProject({ instrumentDoc: next, samplePlan: planWith(useLedger.getState().project.samplePlan, next) });
       })
-      .catch(() => setMessage("问卷润色中断了，先用已经生成的完整版本。"))
+      .catch(() => setMessage("已保留当前完整版本。"))
       .finally(() => setBusy((value) => (value === "instrument" ? null : value)));
   }, [ready, access.instrument, instrumentKey, project.id, patchProject, writeInstrument]);
 
@@ -214,7 +232,7 @@ function StudioPage() {
     if (!ready || !access.draft || !dataOk) return;
     const current = useLedger.getState().project;
     if (current.manuscript || !current.topic) return;
-    const manuscript = buildManuscript(current, computeSample(current.samplePlan, current.paradigm === "定性" ? "interview" : "scale"));
+    const manuscript = buildManuscript(current, computeSample(current.samplePlan, instrumentKind(current.paradigm)));
     if (manuscript) patchProject({ manuscript });
   }, [ready, access.draft, dataOk, project.manuscript, project.topic, project.csv, patchProject]);
 
@@ -230,7 +248,7 @@ function StudioPage() {
       discipline: current.discipline,
       field: current.field,
       paradigm: (current.paradigm || "定量") as Paradigm,
-      hits: hits.map((hit) => ({ name: hit.name, source: hit.source })),
+      hits: hits.map((hit) => ({ name: hit.name, source: hit.source, theme: hit.theme, method: hit.method, variables: hit.variables, population: hit.population })),
     };
     const items: Candidate[] = [];
     for (let variant = 0; variant < 4 && items.length < 3; variant += 1) {
@@ -242,7 +260,7 @@ function StudioPage() {
   }
 
   async function runGenerate(reroll: boolean) {
-    const issue = briefProblem(useLedger.getState().project, vagueKeywords(useLedger.getState().project.keywords), checkSubject(useLedger.getState().project.subjectParts));
+    const issue = briefProblem(useLedger.getState().project, vagueKeywords(useLedger.getState().project.keywords), checkSubject(useLedger.getState().project.subjectParts, useLedger.getState().project.paradigm));
     if (issue) {
       setMessage(issue);
       document.getElementById("brief")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -269,7 +287,7 @@ function StudioPage() {
     setMessage("");
     const current = useLedger.getState().project;
     const keywords = current.keywords.map((word) => word.trim());
-    const sentence = subjectSentence(current.subjectParts, false);
+    const sentence = subjectSentence(current.subjectParts, false, current.paradigm);
     let hits: HotHit[] = reroll ? current.hotHits : [];
     if (!reroll) {
       setBusy("search");
@@ -277,15 +295,18 @@ function StudioPage() {
       const skipped = new Promise<"skip">((resolve) => {
         skipSearch.current = () => resolve("skip");
       });
-      const timer = new Promise<"timeout">((resolve) => window.setTimeout(() => resolve("timeout"), 185_000));
+      const timer = new Promise<"timeout">((resolve) => window.setTimeout(() => resolve("timeout"), 280_000));
       try {
         const outcome = await Promise.race([lookUp({ data: { keywords, subject: sentence } }), skipped, timer]);
-        if (outcome === "skip") searchNote = "没有等检索，题目只按关键词和研究对象生成。";
-        else if (outcome === "timeout") searchNote = "检索超过 3 分钟，先不等了，题目按关键词和研究对象生成。";
-        else if (outcome.ok) hits = outcome.hits;
-        else searchNote = `${outcome.error}题目按关键词和研究对象生成。`;
+        if (outcome === "skip") searchNote = "题目按关键词和研究对象生成。文献可随后补入。";
+        else if (outcome === "timeout") searchNote = "检索时间较长，题目先按关键词和研究对象生成。";
+        else if (outcome.ok) {
+          hits = outcome.hits;
+          if (outcome.note) searchNote = outcome.note;
+        }
+        else searchNote = "检索未完成，题目按关键词和研究对象生成。文献可随后补入。";
       } catch {
-        searchNote = "检索中断了，题目按关键词和研究对象生成。";
+        searchNote = "检索未完成，题目按关键词和研究对象生成。文献可随后补入。";
       }
       skipSearch.current = null;
       patchProject({ hotHits: hits, hotKey: keywords.join("|"), searchNote });
@@ -301,10 +322,23 @@ function StudioPage() {
             keywords,
             subjectParts: current.subjectParts,
             unit: current.unit,
+            category: current.category,
+            branch: current.branch,
             discipline: current.discipline,
             field: current.field,
             paradigm: current.paradigm || "定量",
-            hits: hits.map((hit) => ({ name: hit.name, source: hit.source, basis: hit.basis, journal: hit.journal, indexes: hit.indexes, level: hit.level })),
+            hits: hits.map((hit) => ({
+              name: hit.name,
+              source: hit.source,
+              basis: hit.basis,
+              journal: hit.journal,
+              indexes: hit.indexes,
+              level: hit.level,
+              theme: hit.theme,
+              method: hit.method,
+              variables: hit.variables,
+              population: hit.population,
+            })),
             modelId,
             avoid,
           },
@@ -315,7 +349,7 @@ function StudioPage() {
       items = result.items;
       candidateNote = result.note;
     } catch {
-      candidateNote = "出题服务没有响应，3 个题先按规则生成，稍后可以换一批。";
+      candidateNote = "题目已按当前材料整理，可以再生成一批。";
     }
     if (items.length < 3) {
       for (const item of localRules(current, hits, [...avoid, ...items.map((other) => other.title)])) {
@@ -375,7 +409,7 @@ function StudioPage() {
     const current = useLedger.getState().project;
     if (!current.topic) return;
     if (isStaticPreview()) {
-      setMessage("这是公开预览，初稿用页面里已经生成的版本，不另连模型。");
+      setMessage("初稿按当前题目和已有材料整理。");
       return;
     }
     setBusy("model");
@@ -384,7 +418,7 @@ function StudioPage() {
       const result = await compose({
         data: {
           keywords: current.keywords.map((word) => word.trim()),
-          subject: subjectSentence(current.subjectParts, false),
+          subject: subjectSentence(current.subjectParts, false, current.paradigm),
           unit: current.unit,
           discipline: current.discipline,
           title: current.topic.title,
@@ -422,12 +456,16 @@ function StudioPage() {
       return;
     }
     if (isStaticPreview()) {
-      setMessage("这是公开预览，修订不连模型，这一轮不消耗。");
+      setMessage("这一轮按当前材料整理。");
       return;
     }
     const current = useLedger.getState().project;
     const seed = seedOf(current);
     if (!seed) return;
+    if ((seed.kind === "text" || seed.kind === "meta") && !current.manuscript) {
+      setMessage(seed.kind === "meta" ? "纳入标准和摘录列随题目生成。如需调整，请先修改题目。" : "分析框架随题目中的范式生成。如需更换范式，请先修改题目。");
+      return;
+    }
     setBusy("revise");
     setMessage("");
     try {
@@ -436,7 +474,7 @@ function StudioPage() {
           data: { kind: seed.kind, title: seed.title, question: seed.question, subject: subjectSentence(seed.subject, false), discipline: seed.discipline, parts: seed.parts, pattern: seed.pattern, note: note.trim() },
         });
         if (!result.ok) {
-          setMessage(`${result.error}这一轮没有被消耗。`);
+          setMessage(`${result.error}这一轮修订尚未计入。`);
           return;
         }
         const next = buildInstrument(seed, result.part);
@@ -450,7 +488,7 @@ function StudioPage() {
           data: {
             note: note.trim(),
             target: "全文结构",
-            brief: `${current.topic?.title ?? ""}；${subjectSentence(current.subjectParts, false)}；${current.keywords.join("、")}`,
+            brief: `${current.topic?.title ?? ""}；${subjectSentence(current.subjectParts, false, current.paradigm)}；${current.keywords.join("、")}`,
             manuscript: current.manuscript,
           },
         });
@@ -465,7 +503,7 @@ function StudioPage() {
       }
       setNote("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "修订失败，这一轮没有被消耗。");
+      setMessage(error instanceof Error ? error.message : "修订未完成，这一轮尚未计入。");
     } finally {
       setBusy(null);
     }
@@ -479,34 +517,82 @@ function StudioPage() {
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 md:px-10">
         <div className="grid gap-6 md:grid-cols-[1.4fr_0.8fr] md:items-stretch">
           <div className="flex flex-col justify-center">
-            <p className="kicker">工作台</p>
+            <p className="kicker">开题</p>
             <h1 className="mt-2 font-serif text-3xl leading-snug">从四个词到一份能做的开题</h1>
             <ol className="mt-4 space-y-1.5 text-sm leading-7 text-ink-soft">
-              <li>① 写关键词和研究对象 ② 检索近五年论文和立项，出 3 个题</li>
-              <li>③ 付开题包 {yuan(TOPIC_FEE)}，三个题马上弹出，选一个按建议修改</li>
-              <li>④ 要问卷、样本量计算书和初稿，再补差价升级</li>
+              <li>① 填写关键词和研究对象 ② 检索近五年论文和立项，给出 3 个题目</li>
+              <li>③ 支付开题包 {yuan(TOPIC_FEE)} 后查看三个题目，选定一个并按建议修改</li>
+              <li>④ 如需问卷、访谈提纲、文本分析框架或摘录表，按差价继续</li>
             </ol>
           </div>
           <div className="relative bg-ink px-6 py-6 text-on-cinnabar">
             <span className="absolute inset-y-0 left-0 w-1 bg-brass" aria-hidden="true" />
-            <p className="text-lg">{!ready ? "正在打开" : access.upgraded ? `已升级${contract.name}` : access.topic ? "开题包已付" : "还没有付款"}</p>
+            <p className="text-lg">{!ready ? "正在打开" : access.upgraded ? `已购买${contract.name}` : access.topic ? "已购买开题包" : "尚未购买"}</p>
             <p className="mt-2 text-sm leading-7 text-on-cinnabar/75">
-              {isStaticPreview() ? "文献到对应的库里检索。题目在本页生成，不扣款。" : "检索 1 到 3 分钟，出题不到 1 分钟，出问卷约 1 分钟。收数据另算。"}
+              {isStaticPreview() ? "请到对应文献库检索。题目在本页生成。" : "检索约 2 到 4 分钟，出题不到 2 分钟，问卷约 1 分钟。调查由您自行安排。"}
             </p>
             <p className="mt-5 flex gap-5 text-sm">
               <button className="border-b border-on-cinnabar/50 pb-0.5" onClick={() => replaceProject(exampleProject())}>
-                看例子
+                查看示例
               </button>
               <button className="border-b border-on-cinnabar/50 pb-0.5" onClick={() => newProject()}>
-                我重来
+                重新开始
               </button>
             </p>
           </div>
         </div>
 
         <section id="brief" className="mt-10">
-          <h2 className="text-xl">① 关键词与研究对象</h2>
-          {briefLocked ? <p className="mt-2 text-sm text-brass">开题包已付，题目按这些信息出的，这里不能再改。题目本身可以在第 ③ 步按建议修改。</p> : null}
+          <h2 className="text-xl">{project.paradigm === "文本分析" ? "① 范式、学科与文本" : project.paradigm === "元分析" ? "① 范式、学科与纳入的研究" : "① 范式、学科与研究对象"}</h2>
+          {briefLocked ? <p className="mt-2 text-sm text-brass">开题包已购买，题目依据这些信息生成。如需调整题目，请在第 ③ 步按建议修改。</p> : null}
+          <div className="mt-5">
+            <p className="text-sm text-ink">请选择定量、定性、文本分析或元分析</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {PARADIGMS.map((item) => (
+                <button
+                  key={item.id}
+                  disabled={briefLocked}
+                  className={
+                    project.paradigm === item.id
+                      ? "min-h-11 border border-ink bg-ink px-4 py-2 text-left text-sm text-on-cinnabar disabled:opacity-80"
+                      : "min-h-11 border border-line bg-paper px-4 py-2 text-left text-sm disabled:opacity-60"
+                  }
+                  onClick={() =>
+                    patch({
+                      paradigm: item.id,
+                      instrument: instrumentKind(item.id),
+                      unit:
+                        item.id === "文本分析"
+                          ? TEXT_UNITS.includes(project.unit)
+                            ? project.unit
+                            : "文本"
+                          : item.id === "元分析"
+                            ? "研究"
+                            : project.unit === "文本" || project.unit === "研究"
+                              ? "个人"
+                              : project.unit,
+                    })
+                  }
+                >
+                  <span className="block">{item.label}</span>
+                  <span className={project.paradigm === item.id ? "block text-xs text-on-cinnabar/80" : "block text-xs text-muted"}>{item.note}</span>
+                </button>
+              ))}
+            </div>
+            {project.paradigm === "文本分析" ? (
+              <p className="mt-3 text-xs leading-6 text-muted">
+                出题时按材料选取三个范式。修改题目时，可以换成全部十二个：{TEXT_PARADIGMS.map((item) => item.label).join("、")}。
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-5">
+            <DisciplineFields
+              variant="studio"
+              disabled={briefLocked}
+              value={{ track: project.track, category: project.category, branch: project.branch, discipline: project.discipline, field: project.field }}
+              onChange={(next) => patch(next)}
+            />
+          </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {project.keywords.map((word, index) => (
               <Field key={index} label={`关键词 ${index + 1}`}>
@@ -530,59 +616,18 @@ function StudioPage() {
               value={project.subjectParts}
               disabled={briefLocked}
               legacy={project.legacySubject}
-              onChange={(subjectParts) => patch({ subjectParts, subject: subjectSentence(subjectParts) })}
+              mode={project.paradigm === "文本分析" ? "text" : project.paradigm === "元分析" ? "meta" : "people"}
+              onChange={(subjectParts) => patch({ subjectParts, subject: subjectSentence(subjectParts, true, project.paradigm) })}
             />
           </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div className="mt-4 max-w-xs">
             <Field label="分析单位">
               <select className={controlClass} value={project.unit} disabled={briefLocked} onChange={(event) => patch({ unit: event.target.value })}>
-                {UNITS.map((unit) => (
+                {(project.paradigm === "文本分析" ? TEXT_UNITS : project.paradigm === "元分析" ? ["研究"] : UNITS).map((unit) => (
                   <option key={unit}>{unit}</option>
                 ))}
               </select>
             </Field>
-            <Field label="学科">
-              <select
-                className={controlClass}
-                value={project.discipline}
-                disabled={briefLocked}
-                onChange={(event) => {
-                  const discipline = event.target.value;
-                  patch({ discipline, field: fieldsOf(discipline)[0] ?? "" });
-                }}
-              >
-                {FIELDS.map((item) => (
-                  <option key={item.name}>{item.name}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="细分">
-              <select className={controlClass} value={project.field} disabled={briefLocked} onChange={(event) => patch({ field: event.target.value })}>
-                {fieldsOf(project.discipline).map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          <div className="mt-5">
-            <p className="text-sm text-ink">定量还是定性（由你选，不预选）</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {PARADIGMS.map((item) => (
-                <button
-                  key={item.id}
-                  disabled={briefLocked}
-                  className={
-                    project.paradigm === item.id
-                      ? "min-h-11 border border-ink bg-ink px-4 py-2 text-left text-sm text-on-cinnabar disabled:opacity-80"
-                      : "min-h-11 border border-line bg-paper px-4 py-2 text-left text-sm disabled:opacity-60"
-                  }
-                  onClick={() => patch({ paradigm: item.id, instrument: item.id === "定性" ? "interview" : "scale" })}
-                >
-                  <span className="block">{item.label}</span>
-                  <span className={project.paradigm === item.id ? "block text-xs text-on-cinnabar/80" : "block text-xs text-muted"}>{item.note}</span>
-                </button>
-              ))}
-            </div>
           </div>
         </section>
 
@@ -590,11 +635,11 @@ function StudioPage() {
           <h2 className="text-xl">② 检索并出 3 个题</h2>
           <p className="mt-2 text-sm leading-7 text-ink-soft">
             {isStaticPreview()
-              ? "四个关键词写好后，打开中国知网、万方、维普、外文检索，以及国家自然科学基金、国家社科基金。中文看 CSSCI来源、CSSCI扩展版、北大核心、AMI 各级和 CSCD。外文的 SSCI、SCIE、SCI、ESCI 分别核对，不互相替代。课题看重大、重点、一般、面上和青年。本页同时给出 3 个题目。"
-              : "按四个关键词检索 2021 年以来的中文期刊、外文期刊，以及国家社科基金、国家自然科学基金立项。中文标注 CSSCI来源、CSSCI扩展版、北大核心、AMI 各级和 CSCD。外文分别标注 SSCI、SCIE、SCI 和 ESCI，不互相替代。课题标注重大、重点、一般、面上和青年。检索结束后给出 3 个具体题目。若检索未完成，仍会给出题目。"}
+              ? "请用这四个关键词检索中国知网、万方、维普和外文数据库，以及国家自然科学基金、国家社科基金。中文按 CSSCI 来源、CSSCI 扩展版、北大核心、AMI 各级和 CSCD 核对。外文按 SSCI、SCIE、SCI、ESCI、EI 分别核对。课题按重大、重点、一般、面上和青年查看。本页同时给出 3 个题目。"
+              : "按四个关键词检索 2021 年以来的中文期刊、外文期刊，以及国家社科基金、国家自然科学基金立项。中文标注 CSSCI 来源、CSSCI 扩展版、北大核心、AMI 各级和 CSCD。外文分别标注 SSCI、SCIE、SCI、ESCI 和 EI。课题按国家社科基金、国家自然科学基金，以及重大、重点、一般、面上、青年和西部查看。三个题目对照这些文献的主题、方法、变量和研究对象来写。"}
           </p>
           <details className="mt-3 text-sm">
-            <summary className="min-h-11 py-2 text-muted underline underline-offset-4">出题用哪个模型（默认即可）</summary>
+            <summary className="min-h-11 py-2 text-muted underline underline-offset-4">出题所用模型</summary>
             <div className="mt-2 flex flex-wrap gap-2">
               {MODELS.map((item) => (
                 <button
@@ -604,11 +649,11 @@ function StudioPage() {
                   onClick={() => setModelId(item.id)}
                 >
                   {item.name}
-                  {item.tier === "premium" ? " · 另付" : ""}
+                  {item.tier === "premium" ? " · 另行计费" : ""}
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-xs leading-6 text-muted">所选型号不可用时，自动换成能用的型号，不会因此出不了题。GPT、Claude、Kimi 走自己配置的中转站。</p>
+            <p className="mt-2 text-xs leading-6 text-muted">默认模型即可。若该型号暂不可用，将改用可用型号继续出题。</p>
           </details>
           {briefIssue && !access.topic ? <p className="mt-3 text-sm text-warn">出题前还差一步：{briefIssue}</p> : null}
           {!access.topic ? (
@@ -629,19 +674,19 @@ function StudioPage() {
           {isStaticPreview() ? <LiteratureDesk keywords={project.keywords} /> : null}
           {busy === "search" ? (
             <div className="mt-3 text-sm leading-7 text-ink">
-              <p className="tabular-nums">检索已进行 {clock(phaseSec)}。通常 1 到 3 分钟，超过 3 分钟会自动停下，直接出题。</p>
+              <p className="tabular-nums">检索已进行 {clock(phaseSec)}，通常需要 2 到 4 分钟。</p>
               <button className="min-h-11 text-cinnabar underline underline-offset-4" onClick={() => skipSearch.current?.()}>
-                不等检索，直接出题
+                先看题目
               </button>
             </div>
           ) : null}
-          {busy === "topic" ? <p className="mt-3 text-sm tabular-nums leading-7 text-ink">正在出题 {clock(phaseSec)}。模型不可用时会按规则先出，不会空手。</p> : null}
+          {busy === "topic" ? <p className="mt-3 text-sm tabular-nums leading-7 text-ink">正在整理题目 {clock(phaseSec)}。</p> : null}
           {!isStaticPreview() && project.searchNote && project.hotKey === project.keywords.map((word) => word.trim()).join("|") ? (
             <p className="mt-3 border border-line bg-paper-2 px-3 py-2 text-sm text-ink-soft">{project.searchNote}</p>
           ) : null}
           {project.hotHits.length && project.hotKey === project.keywords.map((word) => word.trim()).join("|") ? (
             <div className="mt-5">
-              <HitList hits={project.hotHits} />
+              <HitList hits={project.hotHits} keywords={project.keywords} />
             </div>
           ) : null}
           {candidatesFresh || access.topic ? (
@@ -652,24 +697,24 @@ function StudioPage() {
                   <p className="text-base">三个题目已经出好了。</p>
                   <p className="mt-1 text-sm leading-7 text-muted">
                     {isStaticPreview()
-                      ? "公开预览不会扣款。点击即可解锁并查看，记录只留在这台浏览器。"
-                      : `付开题包 ${yuan(TOPIC_FEE)} 后马上弹出。题目弹出即视为交付，不退；之后要问卷和初稿，只补差价。`}
+                      ? "点击即可查看三个题目。记录保存在这台浏览器。"
+                      : `支付开题包 ${yuan(TOPIC_FEE)} 后即可查看三个题目。题目交付后，该笔费用按购买说明结算。后续研究工具和初稿按差价购买。`}
                   </p>
                   <div className="mt-4">
                     <LockedTopics count={project.candidates.length} />
                   </div>
                   <Button className="mt-4 w-full sm:w-auto" onClick={() => pay("topic")}>
-                    {isStaticPreview() ? "点击解锁，查看三个题" : `付开题包 ${yuan(TOPIC_FEE)}，弹出三个题`}
+                    {isStaticPreview() ? "查看三个题目" : `支付开题包 ${yuan(TOPIC_FEE)}，查看三个题目`}
                   </Button>
                 </div>
               ) : null}
               {access.topic && project.candidates.length ? (
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-sm text-ink">你的三个题{project.topic ? "（选中的有粗框）" : "，先选一个"}</p>
+                    <p className="text-sm text-ink">三个题目{project.topic ? "，已选中的以粗框标出" : "，请先选择一个"}</p>
                     <div className="flex flex-wrap gap-3 text-sm">
                       <button className="min-h-11 text-cinnabar underline underline-offset-4" onClick={() => setRevealOpen(true)}>
-                        弹出来看
+                        查看三个题目
                       </button>
                       {!topicLocked ? (
                         <button
@@ -712,8 +757,8 @@ function StudioPage() {
             <h2 className="text-xl">③ 定题</h2>
             <div className="mt-4 border-2 border-ink bg-paper p-4">
               <p className="text-xs text-muted">
-                {project.topic.paradigm} · {project.topic.edits ? `已改 ${project.topic.edits} 次` : "原题"}
-                {topicLocked ? " · 已锁定，问卷按这一题出" : ""}
+                {project.topic.paradigm} · {project.topic.edits ? `已修改 ${project.topic.edits} 次` : "原题"}
+                {topicLocked ? ` · 题目已确定，${kind === "text" ? "分析框架" : kind === "meta" ? "摘录表" : kind === "interview" ? "访谈提纲" : "问卷"}按这一题目生成` : ""}
               </p>
               <h3 className="mt-2 text-2xl leading-10">{project.topic.title}</h3>
               <p className="mt-2 text-sm leading-7 text-ink-soft">{project.topic.question}</p>
@@ -729,7 +774,10 @@ function StudioPage() {
                 </div>
               ) : null}
               {!topicLocked ? (
-                <p className="mt-3 text-xs leading-6 text-muted">修改不能随意重写：先套用建议、在下拉里换词，最后只能小改几个字。升级之后题目锁定，因为问卷、筛选题和样本量都从这一题来。</p>
+                <p className="mt-3 text-xs leading-6 text-muted">
+                  修改时请先采用建议，或在选项中更换用词，再作少量措辞调整。购买研究工具之后，题目即固定，
+                  {kind === "text" ? "类目和编码说明" : kind === "meta" ? "检索范围和摘录列" : "问卷或提纲、筛选题和样本量"}都依据这一题目生成。
+                </p>
               ) : null}
             </div>
           </section>
@@ -737,9 +785,10 @@ function StudioPage() {
 
         {access.topic && !access.instrument ? (
           <section id="upgrade" className="mt-12">
-            <h2 className="text-xl">④ 要问卷、样本量和初稿，补差价</h2>
+            <h2 className="text-xl">④ {kind === "text" ? "分析框架" : kind === "meta" ? "摘录表" : "问卷、样本量"}与初稿</h2>
             <p className="mt-2 text-sm leading-7 text-ink-soft">
-              开题包已付 {yuan(TOPIC_FEE)}，这里只补差价。补完马上出{project.paradigm === "定性" ? "访谈提纲" : "问卷"}和样本量计算书；传上数据后出初稿，不再另外收钱。
+              开题包 {yuan(TOPIC_FEE)} 已计入。支付差额后即可获得{kind === "text" ? "分析框架" : kind === "meta" ? "摘录表" : kind === "interview" ? "访谈提纲" : "问卷"}
+              {kind === "text" ? "和文本范围说明" : kind === "meta" ? "和检索说明" : "和样本量计算书"}。上传数据后，初稿包含在这一档中。
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {(Object.keys(CONTRACTS) as (keyof typeof CONTRACTS)[]).map((key) => {
@@ -750,7 +799,7 @@ function StudioPage() {
                     <p className="text-lg">{item.name}</p>
                     <p className="mt-2 font-serif text-3xl tabular-nums">补 {yuan(item.upgrade)}</p>
                     <p className="mt-1 text-sm text-muted">
-                      整档 {yuan(item.total)}，已付 {yuan(TOPIC_FEE)}
+                      整档 {yuan(item.total)}，已计入开题包 {yuan(TOPIC_FEE)}
                     </p>
                     <ul className="mt-3 space-y-1 text-sm text-ink-soft">
                       {item.points.map((point) => (
@@ -761,18 +810,18 @@ function StudioPage() {
                 );
               })}
             </div>
-            {!project.topic ? <p className="mt-3 text-sm text-warn">先在上面选定一个题，问卷要按它出。</p> : null}
+            {!project.topic ? <p className="mt-3 text-sm text-warn">请先在上方选定一个题目，{kind === "text" ? "分析框架" : kind === "meta" ? "摘录表" : "问卷或提纲"}将按该题目生成。</p> : null}
             <Button className="mt-4 w-full sm:w-auto" disabled={!project.topic} onClick={() => pay(CONTRACTS[project.tier].upgradeId)}>
-              补 {yuan(CONTRACTS[project.tier].upgrade)}，升级{CONTRACTS[project.tier].name}
+              支付差额 {yuan(CONTRACTS[project.tier].upgrade)}，购买{CONTRACTS[project.tier].name}
             </Button>
           </section>
         ) : null}
 
         {access.instrument && project.topic ? (
           <section id="instrument" className="mt-12">
-            <h2 className="text-xl">⑤ {kind === "scale" ? "问卷" : "访谈提纲"}</h2>
+            <h2 className="text-xl">⑤ {kind === "text" ? "分析框架" : kind === "meta" ? "摘录表" : kind === "scale" ? "问卷" : "访谈提纲"}</h2>
             {busy === "instrument" ? (
-              <p className="mt-2 text-sm tabular-nums text-ink">模型正在按题目改写核心题项（约 1 分钟，已 {clock(phaseSec)}）。下面先给完整的规则版本。</p>
+              <p className="mt-2 text-sm tabular-nums text-ink">正在按题目整理题项（约 1 分钟，已 {clock(phaseSec)}）。下方先显示完整版本。</p>
             ) : doc?.source === "model" ? (
               <p className="mt-2 text-sm text-ok">核心题项已由模型按这一题改写。筛选题、计分、质量控制由规则生成。</p>
             ) : null}
@@ -787,14 +836,14 @@ function StudioPage() {
                   <Button
                     tone="ink"
                     onClick={() =>
-                      download(`${kind === "scale" ? "问卷" : "访谈提纲"}-${project.id}.doc`, instrumentWordHtml(doc, sampleHtml(sample)), "application/msword;charset=utf-8")
+                      download(`${kind === "text" ? "分析框架" : kind === "meta" ? "摘录表" : kind === "scale" ? "问卷" : "访谈提纲"}-${project.id}.doc`, instrumentWordHtml(doc, sampleHtml(sample)), "application/msword;charset=utf-8")
                     }
                   >
-                    下载 Word（含样本量计算书）
+                    下载 Word（含{kind === "text" ? "文本范围说明" : kind === "meta" ? "检索说明" : "样本量计算书"}）
                   </Button>
                   <Button
                     tone="ghost"
-                    onClick={() => download(`${kind === "scale" ? "问卷" : "访谈提纲"}-${project.id}.md`, `${instrumentMarkdown(doc)}\n${sampleMarkdown(sample)}`, "text/markdown;charset=utf-8")}
+                    onClick={() => download(`${kind === "text" ? "分析框架" : kind === "meta" ? "摘录表" : kind === "scale" ? "问卷" : "访谈提纲"}-${project.id}.md`, `${instrumentMarkdown(doc)}\n${sampleMarkdown(sample)}`, "text/markdown;charset=utf-8")}
                   >
                     下载 Markdown
                   </Button>
@@ -806,11 +855,11 @@ function StudioPage() {
             ) : (
               <p className="mt-3 text-sm text-muted">正在生成…</p>
             )}
-            {!project.manuscript && remaining > 0 && doc ? (
+            {!project.manuscript && remaining > 0 && doc && kind !== "text" ? (
               <div className="mt-6 border-t border-line pt-4">
                 <Field
-                  label={`只改题项（剩 ${remaining} 轮，${kind === "scale" ? "问卷" : "提纲"}和成稿共用）`}
-                  hint={kind === "scale" ? "写清改哪一部分、怎么改。筛选题和计分规则不会被改掉。" : "写清改哪个模块、怎么改。筛选标准和登记表不会被改掉。"}
+                  label={`修改题项（剩余 ${remaining} 轮，${kind === "scale" ? "问卷" : "提纲"}与成稿共用）`}
+                  hint={kind === "scale" ? "请写明修改哪一部分、如何修改。筛选题和计分规则保持不变。" : "请写明修改哪个模块、如何修改。筛选标准和登记表保持不变。"}
                 >
                   <textarea className={`${controlClass} min-h-20`} value={note} onChange={(event) => setNote(event.target.value)} />
                 </Field>
@@ -824,9 +873,13 @@ function StudioPage() {
 
         {access.instrument && project.topic ? (
           <section id="sample" className="mt-12">
-            <h2 className="text-xl">⑥ 样本量计算书</h2>
+            <h2 className="text-xl">⑥ {kind === "text" ? "文本范围与编码" : kind === "meta" ? "检索与摘录" : "样本量计算书"}</h2>
             <p className="mt-2 text-sm leading-7 text-ink-soft">
-              {kind === "scale"
+              {kind === "text"
+                ? "这里写纳入的文本范围，以及两名编码者如何用 Cohen's κ 核对类目。κ 按实际归类计算，并写入方法。"
+                : kind === "meta"
+                ? "先写检索式和纳入标准。效应量从原文摘录，合并效应在摘录表完成之后计算。"
+                : kind === "scale"
                 ? "有效问卷要收多少，按你要做的分析逐项计算：回归用统计功效（非中心 F 分布，与 G*Power 同一算法），因子分析用题项比，估计比例用 Cochran 公式，最后按无效率放大发放量。每一步写出公式、代入和出处。"
                 : "访谈人数按亚群体和 10+3 饱和停止规则计算，再按爽约率放大邀约人数。每一步写出公式和出处。"}
             </p>
@@ -838,15 +891,19 @@ function StudioPage() {
 
         {access.instrument && !access.draft ? (
           <section className="mt-12 border border-line bg-paper-2 p-4 text-sm leading-7">
-            <p>你买的是分析包，不含初稿。要初稿，可在价格页补买成稿包。</p>
+            <p>当前为分析包，交付研究工具和样本量说明。初稿在成稿包中提供。</p>
           </section>
         ) : null}
 
         {access.draft && project.topic ? (
           <section id="data" className="mt-12">
-            <h2 className="text-xl">⑦ 上传你收回来的数据</h2>
+            <h2 className="text-xl">{kind === "text" ? "⑦ 上传编码表" : kind === "meta" ? "⑦ 上传摘录表" : "⑦ 上传收回的数据"}</h2>
             <p className="mt-2 text-sm leading-7 text-muted">
-              csv 或 Excel，第一行是变量名。表留在你这台电脑上，写稿时只用算好的汇总，不会把原始行交出去。上传前先删掉姓名、电话这类能认出人的列。
+              {kind === "text"
+                ? "请上传 csv 或 Excel。一行一条摘录，列写类目。文件保存在这台电脑，写稿时使用汇总。"
+                : kind === "meta"
+                  ? "请上传 csv 或 Excel。一行一项研究，列写效应量、样本量和测法。合并效应在表完成之后计算。"
+                  : "请上传 csv 或 Excel，第一行是变量名。文件保存在这台电脑，写稿时使用汇总。上传前请删除姓名、电话等能够认出个人的列。"}
             </p>
             <label
               className="mt-4 flex min-h-32 cursor-pointer flex-col items-center justify-center border border-dashed border-brass bg-paper-2 px-4 text-center"
@@ -856,7 +913,7 @@ function StudioPage() {
                 void onFile(event.dataTransfer.files[0] ?? null);
               }}
             >
-              <span className="text-sm">{busy === "file" ? "正在解析…" : "点这里选择文件，或把文件拖进来"}</span>
+              <span className="text-sm">{busy === "file" ? "正在读取…" : "选择文件，或将文件拖到此处"}</span>
               <span className="mt-1 text-xs text-muted">只传你自己收集的数据</span>
               <input
                 className="hidden"
@@ -878,11 +935,11 @@ function StudioPage() {
                   csvIsDemo: true,
                   includeStats: false,
                   fileName: "练习数据.csv",
-                  parseNote: "练习数据，16 行，含一个空值和一个 NA。不会把这些数字写进成稿。",
+                  parseNote: "练习数据，16 行，含一个空值和一个 NA。数字不写入初稿。",
                 })
               }
             >
-              没有文件时，解析一份练习表
+              没有文件时，可先查看一份练习表
             </Button>
             {project.parseNote ? <p className="mt-4 text-sm text-brass">{project.parseNote}</p> : null}
             {project.csv ? (
@@ -893,7 +950,7 @@ function StudioPage() {
             {project.csv && !dataOk ? <p className="mt-3 text-sm text-warn">至少要解析出 5 行、2 列，才能出初稿。</p> : null}
             {kind === "scale" && summary.rows > 0 && summary.rows < sample.target ? (
               <p className="mt-3 text-sm text-note">
-                现在 {summary.rows} 行，低于样本量计算书的 {sample.target} 份。初稿照样可以出，但结果节只能写描述，不宜下推断结论。
+                当前 {summary.rows} 行，低于计算书中的 {sample.target} 份。初稿可以先写描述，推断留到样本达到计算书的要求之后。
               </p>
             ) : null}
           </section>
@@ -904,7 +961,7 @@ function StudioPage() {
             <h2 className="text-xl">⑧ 初稿</h2>
             {project.manuscript ? (
               <article className="mt-4 bg-paper-2 p-4">
-                <p className="text-xs text-brass">{project.manuscript.source === "model" ? "写顺后的一版" : "先按你的设计整理的一版"}</p>
+                <p className="text-xs text-brass">{project.manuscript.source === "model" ? "润色后的一版" : "按当前设计整理的初稿"}</p>
                 <h3 className="mt-2 text-2xl leading-10">{project.manuscript.title}</h3>
                 <p className="mt-3 text-sm leading-7">{project.manuscript.abstract}</p>
                 {project.manuscript.sections.map((section) => (
@@ -921,7 +978,7 @@ function StudioPage() {
                 <p className="mt-4 text-xs text-muted">{DISCLOSURE}</p>
                 <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                   <Button tone="ink" disabled={busy !== null} onClick={() => void writeModel()}>
-                    {busy === "model" ? `正在写 · ${clock(phaseSec)}` : "把这版写顺"}
+                    {busy === "model" ? `正在写 · ${clock(phaseSec)}` : "润色这一版"}
                   </Button>
                   <Button
                     tone="ghost"
@@ -954,7 +1011,7 @@ function StudioPage() {
         planId={planId}
         open={payOpen}
         projectId={project.id}
-        note={planId === "topic" ? "付完马上弹出三个题。题目弹出即视为交付，不退。" : undefined}
+        note={planId === "topic" ? "支付后即可查看三个题目。题目交付后，该笔费用按购买说明结算。" : undefined}
         onOpenChange={setPayOpen}
         onPaid={(paid) => {
           if (paid === "topic") window.setTimeout(() => setRevealOpen(true), 120);
@@ -990,12 +1047,13 @@ function clock(total: number) {
 }
 
 function briefProblem(project: Project, vague: string[], subject: ReturnType<typeof checkSubject>) {
-  if (project.keywords.some((word) => word.trim().length < 2)) return "四个关键词都要写满，每个至少两个字。";
+  if (!project.paradigm) return "请选择定量、定性、文本分析或元分析。";
+  if (!project.discipline) return "请再选择一个具体学科。";
+  if (project.keywords.some((word) => word.trim().length < 2)) return "四个关键词都需要写满，每个至少两个字。";
   if (vague.length) return `这几个词太宽，看不出要观察什么：${vague.join("、")}。`;
   if (subject.missing.length) return `研究对象还缺：${subject.missing.join("；")}。`;
   if (subject.problems.length) return subject.problems[0]!;
-  if (!project.field) return "再选一个细分学科。";
-  if (!project.paradigm) return "选定量（问卷）还是定性（访谈）。";
+  if (directionsOf(project.discipline).length && !directionsOf(project.discipline).includes(project.field)) return "请再选择一个方向。";
   return null;
 }
 

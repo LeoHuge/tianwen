@@ -25,9 +25,6 @@ export const CHAT_PREFERENCE = [
   "grok-3",
 ];
 
-/** 联网检索用：需要支持 web_search 工具的型号。 */
-export const SEARCH_PREFERENCE = ["grok-4.5", "grok-4.7", "grok-4-1-fast-reasoning", "grok-4-fast-reasoning", "grok-4", "grok-4-latest"];
-
 export function xaiBase() {
   return (process.env.XAI_BASE_URL || "https://api.x.ai/v1").replace(/\/$/, "");
 }
@@ -141,8 +138,18 @@ export async function chatJson(input: {
       if (response.status === 401 || response.status === 403) {
         throw new ModelError(`模型密钥无效或没有权限（${response.status}）`, response.status);
       }
-      if (response.status === 429 || response.status >= 500) {
-        lastError = `模型服务繁忙（${response.status}）`;
+      if (response.status === 429) {
+        const header = Number(response.headers.get("retry-after"));
+        const asked = Number.isFinite(header) && header > 0 ? header * 1000 : 45_000;
+        const wait = Math.min(asked, 50_000, left - 25_000);
+        if (tries < 2 && wait >= 8_000) {
+          await sleep(wait);
+          continue;
+        }
+        throw new ModelError("模型每分钟额度用完了", 429);
+      }
+      if (response.status >= 500) {
+        lastError = "模型服务暂时没有回应";
         await sleep(1500);
         continue;
       }
@@ -192,40 +199,71 @@ function readResponse(body: unknown) {
   return { text, links };
 }
 
-/** 用 Responses 接口加 web_search 工具检索。返回模型的原文和它打开过的链接。 */
-export async function webSearch(input: { apiKey: string; models: string[]; prompt: string; deadline: number }) {
+function limitMessage(body: string) {
+  if (/quota|credit|billing|insufficient/i.test(body)) return "检索额度已经用完，到 xAI 控制台看剩余额度。";
+  return "这个密钥每分钟的检索次数用完了。等一分钟，只点一次。";
+}
+
+/**
+ * 一次只打一个型号的 web_search。
+ * 429 是这个密钥的每分钟上限，换型号或隔几秒再打会把额度打得更满，所以只等过这一分钟再发同一条。
+ */
+export async function webSearch(input: { apiKey: string; model: string; prompt: string; deadline: number; domains?: string[] }) {
+  let limitWaited = false;
+  let transientRetried = false;
+  let domains = input.domains;
   let lastError = "检索服务暂时不可用";
-  for (const model of input.models) {
+  while (Date.now() < input.deadline - 20_000) {
     const left = input.deadline - Date.now();
-    if (left < 15000) break;
     let response: Response;
     try {
       response = await fetch(`${xaiBase()}/responses`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${input.apiKey}` },
         body: JSON.stringify({
-          model,
-          tools: [{ type: "web_search" }],
-          tool_choice: "auto",
+          model: input.model,
+          tools: [{ type: "web_search", ...(domains?.length ? { allowed_domains: domains.slice(0, 5) } : {}) }],
+          tool_choice: "required",
           input: [{ role: "user", content: input.prompt }],
         }),
         signal: AbortSignal.timeout(left - 3000),
       });
     } catch (error) {
       lastError = isTimeout(error) ? "检索超时" : "连不上检索服务";
-      if (isTimeout(error)) break;
+      if (isTimeout(error) || transientRetried) break;
+      transientRetried = true;
+      await sleep(2000);
       continue;
     }
-    if (response.status === 401 || response.status === 403) throw new ModelError(`检索密钥无效或没有权限（${response.status}）`, response.status);
-    if (!response.ok) {
-      lastError = `检索没有完成（${response.status}）`;
-      if (response.status === 429 || response.status >= 500) await sleep(1500);
+    if (response.status === 401 || response.status === 403) throw new ModelError("检索密钥无效或没有权限。", response.status);
+    if (response.status === 429) {
+      const message = limitMessage(await response.text().catch(() => ""));
+      const header = Number(response.headers.get("retry-after"));
+      const asked = Number.isFinite(header) && header > 0 ? header * 1000 : 60_000;
+      const wait = Math.min(asked, 70_000, left - 25_000);
+      if (limitWaited || /额度已经用完/.test(message) || wait < 8_000) throw new ModelError(message, 429);
+      limitWaited = true;
+      await sleep(wait);
       continue;
+    }
+    if (response.status === 400 && domains?.length) {
+      domains = undefined;
+      continue;
+    }
+    if (!response.ok) {
+      lastError = response.status >= 500 ? "检索服务暂时没有回应。" : "检索没有完成。";
+      if (response.status >= 500 && !transientRetried) {
+        transientRetried = true;
+        await sleep(2000);
+        continue;
+      }
+      break;
     }
     const body = (await response.json().catch(() => null)) as unknown;
     const { text, links } = readResponse(body);
-    if (text.trim()) return { text, links, model };
-    lastError = "检索没有返回内容";
+    if (text.trim()) return { text, links, model: input.model };
+    lastError = "检索没有返回内容。";
+    break;
   }
   throw new ModelError(lastError);
 }

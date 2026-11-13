@@ -98,14 +98,17 @@ function Block({ title, items }: { title: string; items: string[] }) {
 }
 
 export function InstrumentView({ doc }: { doc: Instrument }) {
-  const counts = doc.sections.reduce((sum, section) => sum + section.items.filter((item) => item.kind !== "note").length, 0);
+  const textual = doc.kind === "text" || doc.kind === "meta";
+  const counts = doc.sections.reduce((sum, section) => sum + section.items.filter((item) => textual || item.kind !== "note").length, 0);
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        {doc.kind === "scale" ? "问卷" : "访谈提纲"}共 {doc.sections.length} 部分、{counts} {doc.kind === "scale" ? "题" : "条"}，预计 {doc.minutes} 分钟。
+        {textual
+          ? `分析框架共 ${doc.sections.length} 部分。不设作答时长。`
+          : `${doc.kind === "scale" ? "问卷" : "访谈提纲"}共 ${doc.sections.length} 部分、${counts} ${doc.kind === "scale" ? "题" : "条"}，预计 ${doc.minutes} 分钟。`}
       </p>
       <div className="border border-ink bg-paper p-4">
-        <p className="text-xs text-muted">{doc.kind === "scale" ? "卷首语" : "开场白（照读）"}</p>
+        <p className="text-xs text-muted">{textual ? "使用说明" : doc.kind === "scale" ? "卷首语" : "开场白（照读）"}</p>
         {doc.intro.split("\n").map((line) => (
           <p key={line} className="mt-1 text-sm leading-7">
             {line}
@@ -116,7 +119,7 @@ export function InstrumentView({ doc }: { doc: Instrument }) {
         <Section key={section.id} section={section} />
       ))}
       <section className="border-t border-line pt-4">
-        <h3 className="text-lg">{doc.kind === "scale" ? "变量与题项对照表" : "初始编码框架"}</h3>
+        <h3 className="text-lg">{textual ? "类目与编码说明" : doc.kind === "scale" ? "变量与题项对照表" : "初始编码框架"}</h3>
         <div className="mt-2 overflow-x-auto border border-line">
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead className="bg-paper-2 text-ink">
@@ -140,8 +143,8 @@ export function InstrumentView({ doc }: { doc: Instrument }) {
           </table>
         </div>
       </section>
-      <Block title={doc.kind === "scale" ? "质量控制：哪些问卷算无效" : "质量控制"} items={doc.quality} />
-      <Block title={doc.kind === "scale" ? "预调查" : "预访谈"} items={doc.pilot} />
+      <Block title={textual ? "质量控制" : doc.kind === "scale" ? "质量控制：哪些问卷算无效" : "质量控制"} items={doc.quality} />
+      <Block title={textual ? "试编码" : doc.kind === "scale" ? "预调查" : "预访谈"} items={doc.pilot} />
       <Block title="分析计划" items={doc.analysis} />
     </div>
   );

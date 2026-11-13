@@ -10,17 +10,17 @@ export const Route = createFileRoute("/pricing")({ component: PricingPage });
 
 const MATRIX: string[][] = [
   ["交付", "开题包", "分析包", "成稿包", "三包合买"],
-  ["检索中外文论文与立项，标注 CSSCI、AMI 各级、CSCD、SSCI、SCIE、SCI、ESCI", "含", "含", "含", "含"],
+  ["检索中外文论文与立项，标注 CSSCI、AMI 各级、CSCD、SSCI、SCIE、SCI、ESCI、EI", "含", "含", "含", "含"],
   ["具体论文题目", "3 个", "含", "含", "含"],
   ["按建议修改选题", "含", "含", "含", "含"],
   ["问卷或访谈提纲", "不含", "含", "含", "含"],
   ["样本量计算书（公式与出处）", "不含", "含", "写入成稿", "写入成稿"],
   ["知情同意与质量控制", "不含", "含", "含", "含"],
-  ["描述统计", "本地", "本地", "本地", "本地"],
+  ["描述统计", "在本机计算", "在本机计算", "在本机计算", "在本机计算"],
   ["成稿初稿", "不含", "不含", "含", "含"],
-  ["结构性修订", "0 轮", "题项 1 轮", "1 轮", "3 轮人工协助"],
-  ["文献逐条核对", "不做", "不做", "不做", "不做"],
-  ["统计结果", "你自己算", "你自己算", "你自己算", "你自己算"],
+  ["结构性修订", "按建议改题", "题项 1 轮", "1 轮", "3 轮人工协助"],
+  ["文献出处", "保持检索原文", "保持检索原文", "保持检索原文", "保持检索原文"],
+  ["统计结果", "按您的数据填写", "按您的数据填写", "按您的数据填写", "按您的数据填写"],
 ];
 
 function PricingPage() {
@@ -35,7 +35,7 @@ function PricingPage() {
     <Shell>
       <div className="mx-auto max-w-[1200px] px-5 py-14 md:px-10">
         <p className="kicker">人民币</p>
-        <h1 className="mt-3 font-serif text-4xl leading-snug">天问开题，先看这张表</h1>
+        <h1 className="mt-3 font-serif text-4xl leading-snug">各档费用与交付</h1>
         <div className="mt-6 max-w-3xl overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">
             <thead>
@@ -81,7 +81,7 @@ function PricingPage() {
           </table>
         </div>
         <p className="mt-4 max-w-2xl text-base leading-8 text-ink-soft">
-          选题单独付：付 ¥199，检索出的三个题马上弹出，可以按建议修改。要问卷、样本量计算书和初稿，再补差价，传上数据就出初稿。
+          选题可单独购买：支付 ¥199 后即可查看三个题目，并按建议修改。如需问卷、样本量计算书和初稿，再支付差额。上传数据后交付初稿。
         </p>
 
         <div className="mt-8">
@@ -90,14 +90,14 @@ function PricingPage() {
 
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           <button className="sheet p-6 text-left transition hover:border-ink" onClick={() => buy("addon-buyout")}>
-            <p className="text-xs text-brass">一修用完之后</p>
+            <p className="text-xs text-brass">成稿包修订用完之后</p>
             <p className="mt-1 font-serif text-3xl tabular-nums">{yuan(230)}</p>
-            <p className="mt-2 text-sm text-ink-soft">一修用完了，再改一轮是这个价。不会因此变成无限改。</p>
+            <p className="mt-2 text-sm text-ink-soft">成稿包的一轮修订用完之后，按此价格再增加一轮结构性修订。</p>
           </button>
           <button className="sheet p-6 text-left transition hover:border-ink" onClick={() => buy("addon-revise")}>
-            <p className="text-xs text-brass">三修或年匣用完后</p>
+            <p className="text-xs text-brass">三包合买或年匣用完之后</p>
             <p className="mt-1 font-serif text-3xl tabular-nums">{yuan(140)}</p>
-            <p className="mt-2 text-sm text-ink-soft">三轮用完之后，再改一轮。改的是结构和表述，不是把题推倒重来。</p>
+            <p className="mt-2 text-sm text-ink-soft">三轮用完之后，按此价格再增加一轮。修订用于调整结构和表述。</p>
           </button>
         </div>
 
@@ -124,16 +124,16 @@ function PricingPage() {
           <div>
             <h2 className="text-2xl">这些钱对应什么</h2>
             <ul className="mt-4 space-y-3 text-base leading-7 text-ink-soft">
-              <li>开题包 ¥199。检索、三个题、按建议改题。觉得题不行就停，不用再花钱。</li>
-              <li>分析包 ¥599。一份能发出去的问卷或访谈提纲，样本量按公式算出并写明出处。不含替你去发。</li>
-              <li>成稿包 ¥799，已买开题包补 ¥600。从问卷到初稿，能改一轮。不含文献核对，不含统计代码。</li>
-              <li>三包合买 ¥1,199，已买开题包补 ¥1,000。同样的交付，三轮结构性修订由人工协助。第 4 轮 ¥140。</li>
-              <li>年匣 ¥6,120。给带学生的人，8 个题，每个仍是三轮。</li>
-              <li>统计代码 ¥2,520。要 Stata、R 或访谈编码表，得另外买。</li>
+              <li>开题包 ¥199。检索、三个题目，以及按建议修改。查看题目后，如不继续，无需购买后续内容。</li>
+              <li>分析包 ¥599。一份可发放的问卷或访谈提纲，样本量按公式计算并写明出处。问卷由您发放。</li>
+              <li>成稿包 ¥799，已购买开题包的补 ¥600。从问卷到初稿，含一轮修订。文献保持检索原文。统计代码另行提供。</li>
+              <li>三包合买 ¥1,199，已购买开题包的补 ¥1,000。同样的交付，三轮结构性修订由人工协助。第 4 轮 ¥140。</li>
+              <li>年匣 ¥6,120。供带学生的教研室使用，8 个题目，每个含三轮修订。</li>
+              <li>统计代码 ¥2,520。Stata、R 或访谈编码表另行购买。</li>
             </ul>
           </div>
           <aside className="border border-brass bg-brass-soft p-5 text-ink">
-            <p className="text-xs">不在扫码里</p>
+            <p className="text-xs">另行预约</p>
             <h3 className="mt-2 text-2xl">{HUMAN_REVIEW.name}</h3>
             <p className="mt-2 font-serif text-4xl tabular-nums">{yuan(HUMAN_REVIEW.price)}</p>
             <p className="mt-3 text-sm">{HUMAN_REVIEW.note}</p>
@@ -141,9 +141,9 @@ function PricingPage() {
         </section>
 
         <section className="mt-12 border border-line p-5">
-          <h2 className="text-2xl">付款前先看退款</h2>
+          <h2 className="text-2xl">付款前请看退款范围</h2>
           <p className="mt-3 text-base leading-8 text-ink-soft">
-            还没生成，可以退。开题包的三个题弹出即视为交付，不退。一修的初稿出来之后，不因为文笔不满意退款。三修没用来改的轮次，按剩下的轮数退差价。年匣里已经打开的题不退；一个题都还没开始、购买后 7 天内，可以全退。现在这个页面不会真扣款，所以也没有真退款。
+            内容生成之前可以退回。开题包的三个题目交付之后，该笔费用按购买说明结算。成稿包的初稿交付之后，不因表述偏好退回。三包合买中尚未使用的轮次，按剩余轮数退回差额。年匣中已经开始的题目不退回；一个题目都尚未开始、且在购买后 7 日内，可以全额退回。当前为预览，确认后即可查看，不发生扣款。
           </p>
         </section>
       </div>

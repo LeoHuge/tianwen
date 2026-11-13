@@ -23,6 +23,7 @@ export type SamplePlan = {
   subgroups: number;
   perGroup: number;
   dropout: number;
+  texts: number;
 };
 
 export type SampleStep = {
@@ -37,7 +38,7 @@ export type SampleStep = {
 };
 
 export type SampleResult = {
-  kind: "scale" | "interview";
+  kind: "scale" | "interview" | "text" | "meta";
   steps: SampleStep[];
   adjust: SampleStep[];
   required: number;
@@ -70,6 +71,7 @@ export const DEFAULT_PLAN: SamplePlan = {
   subgroups: 1,
   perGroup: 13,
   dropout: 0.2,
+  texts: 1,
 };
 
 export const ANALYSES: { id: Analysis; label: string; hint: string }[] = [
@@ -119,6 +121,11 @@ export const REFERENCES: Record<string, string> = {
   "Kaiser, 1974": "Kaiser, H. F. (1974). An index of factorial simplicity. Psychometrika, 39(1), 31–36.",
   "Braun & Clarke, 2006":
     "Braun, V., & Clarke, V. (2006). Using thematic analysis in psychology. Qualitative Research in Psychology, 3(2), 77–101.",
+  "Cohen, 1960": "Cohen, J. (1960). A coefficient of agreement for nominal scales. Educational and Psychological Measurement, 20(1), 37–46.",
+  "Krippendorff, 2019": "Krippendorff, K. (2019). Content analysis: An introduction to its methodology (4th ed.). Thousand Oaks, CA: SAGE.",
+  "Page et al., 2021":
+    "Page, M. J., McKenzie, J. E., Bossuyt, P. M., Boutron, I., Hoffmann, T. C., Mulrow, C. D., Shamseer, L., Tetzlaff, J. M., Akl, E. A., Brennan, S. E., Chou, R., Glanville, J., Grimshaw, J. M., Hróbjartsson, A., Lalu, M. M., Li, T., Loder, E. W., Mayo-Wilson, E., McDonald, S., McGuinness, L. A., Stewart, L. A., Thomas, J., Tricco, A. C., Welch, V. A., Whiting, P., & Moher, D. (2021). The PRISMA 2020 statement: An updated guideline for reporting systematic reviews. BMJ, 372, n71.",
+  "Borenstein et al., 2009": "Borenstein, M., Hedges, L. V., Higgins, J. P. T., & Rothstein, H. R. (2009). Introduction to meta-analysis. Chichester: John Wiley & Sons.",
 };
 
 // ---------- 分布函数 ----------
@@ -252,7 +259,9 @@ export function anovaN(f: number, groups: number, alpha = 0.05, power = 0.8) {
 
 // ---------- 计算书 ----------
 
-export function computeSample(plan: SamplePlan, kind: "scale" | "interview"): SampleResult {
+export function computeSample(plan: SamplePlan, kind: "scale" | "interview" | "text" | "meta"): SampleResult {
+  if (kind === "text") return textSheet(plan);
+  if (kind === "meta") return metaSheet();
   return kind === "interview" ? interviewSheet(plan) : scaleSheet(plan);
 }
 
@@ -413,6 +422,83 @@ function scaleSheet(input: SamplePlan): SampleResult {
   };
 }
 
+function metaSheet(): SampleResult {
+  const steps: SampleStep[] = [
+    {
+      key: "search",
+      label: "写下检索式",
+      formula: "按 PRISMA 2020 记录数据库、检索式、检索日期和命中条数。",
+      work: "命中条数在检索之后填写。",
+      result: 0,
+      unit: "条题录（待填）",
+      cite: ["Page et al., 2021"],
+      note: "题录数量与合并效应的样本量分别记录。",
+    },
+    {
+      key: "extract",
+      label: "摘录效应量",
+      formula: "纳入的研究须报告效应量（r、d、OR 或回归系数及标准误）和样本量。",
+      work: "效应量从原文抄录。合并效应、异质性和发表偏倚在摘录表完成之后计算。",
+      result: 0,
+      unit: "项研究（待填）",
+      cite: ["Borenstein et al., 2009"],
+      note: "合并效应在摘录完成之后，按原文中的效应量计算。",
+    },
+  ];
+  return {
+    kind: "meta",
+    steps,
+    adjust: [],
+    required: 0,
+    requiredBy: "检索与纳入",
+    target: 0,
+    issue: 0,
+    unit: "项研究",
+    issueUnit: "项研究",
+    sentence: "分析单位是一项已发表研究。先定检索式和纳入标准，效应量只从原文摘录。合并效应在摘录完成前不计算。",
+    references: ["Page et al., 2021", "Borenstein et al., 2009"].map((key) => REFERENCES[key]!),
+  };
+}
+
+function textSheet(input: SamplePlan): SampleResult {
+  const n = sanitize(input).texts;
+  const steps: SampleStep[] = [
+    {
+      key: "corpus",
+      label: "划定文本范围",
+      formula: "分析单位是从文本中抽出的条目。",
+      work: `纳入 ${n} 份文本。先写明版本、时间和不纳入的部分，再逐条抽取。`,
+      result: n,
+      unit: "份文本",
+      cite: ["Krippendorff, 2019"],
+      note: "一部电影、一组字幕或一份政策文本，各算一份。份数表示材料范围。",
+    },
+    {
+      key: "kappa",
+      label: "两名编码者独立归类",
+      formula: "Cohen's κ = (pₒ − pₑ) / (1 − pₑ)",
+      work: "两名编码者先试编同一小段，修订类目说明，再各自编码全文。κ 按实际归类计算，并写入方法。",
+      result: 2,
+      unit: "名编码者",
+      cite: ["Cohen, 1960"],
+      note: "κ 报告类目是否一致，并在方法中写明。",
+    },
+  ];
+  return {
+    kind: "text",
+    steps,
+    adjust: [],
+    required: n,
+    requiredBy: "划定文本范围",
+    target: n,
+    issue: n,
+    unit: "份文本",
+    issueUnit: "份文本",
+    sentence: `材料纳入 ${n} 份文本。分析单位是从文本中抽出的条目，不计算问卷份数或访谈人数。类目确定后由两名编码者独立归类，一致性用 Cohen's κ 报告，数字须研究者自己计算。`,
+    references: ["Krippendorff, 2019", "Cohen, 1960"].map((key) => REFERENCES[key]!),
+  };
+}
+
 function interviewSheet(input: SamplePlan): SampleResult {
   const plan = sanitize(input);
   const g = plan.subgroups;
@@ -461,11 +547,13 @@ function interviewSheet(input: SamplePlan): SampleResult {
 
 /** 「计划发放 389 份」「计划邀约 32 人」 */
 export function issueLabel(result: SampleResult) {
+  if (result.kind === "text") return `纳入 ${result.target} 份文本，两名编码者独立归类`;
+  if (result.kind === "meta") return "检索完成后，按纳入标准摘录效应量，再计算合并效应";
   return `计划${result.kind === "scale" ? "发放" : "邀约"} ${result.issue} ${result.issueUnit.replace(/[（）]|发放|邀约/g, "")}`;
 }
 
 export function sampleMarkdown(result: SampleResult) {
-  const lines = ["## 样本量计算书", "", `**结论**：至少 ${result.target} ${result.unit}，${issueLabel(result)}。`, ""];
+  const lines = [result.kind === "text" ? "## 文本范围与编码" : result.kind === "meta" ? "## 检索与摘录" : "## 样本量计算书", "", `**结论**：${result.kind === "text" || result.kind === "meta" ? issueLabel(result) : `至少 ${result.target} ${result.unit}，${issueLabel(result)}`}。`, ""];
   for (const step of [...result.steps, ...result.adjust]) {
     lines.push(`### ${step.label}：${step.result} ${step.unit}`, "", `公式：${step.formula}`, "", `计算：${step.work}`, "");
     if (step.cite.length) lines.push(`依据：${step.cite.join("；")}`, "");
@@ -485,7 +573,7 @@ export function sampleHtml(result: SampleResult) {
         }${step.note ? `<p>说明：${esc(step.note)}</p>` : ""}`,
     )
     .join("");
-  return `<h2>样本量计算书</h2><p><b>结论：</b>至少 ${result.target} ${esc(result.unit)}，${esc(issueLabel(result))}。</p>${steps}<p><b>写进论文的一句话：</b>${esc(result.sentence)}</p><p><b>参考文献</b></p><ul>${result.references.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`;
+  return `<h2>${result.kind === "text" ? "文本范围与编码" : result.kind === "meta" ? "检索与摘录" : "样本量计算书"}</h2><p><b>结论：</b>${esc(result.kind === "text" || result.kind === "meta" ? issueLabel(result) : `至少 ${result.target} ${result.unit}，${issueLabel(result)}`)}。</p>${steps}<p><b>写进论文的一句话：</b>${esc(result.sentence)}</p><p><b>参考文献</b></p><ul>${result.references.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`;
 }
 
 export function sanitize(plan: Partial<SamplePlan>): SamplePlan {
@@ -513,6 +601,7 @@ export function sanitize(plan: Partial<SamplePlan>): SamplePlan {
     subgroups: Math.round(clamp(base.subgroups, 1, 12, 1)),
     perGroup: Math.round(clamp(base.perGroup, 6, 40, 13)),
     dropout: clamp(base.dropout, 0, 1, 0.2),
+    texts: Math.round(clamp(base.texts, 1, 30, 1)),
   };
 }
 

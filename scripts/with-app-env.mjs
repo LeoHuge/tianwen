@@ -19,7 +19,7 @@
  * Vite picks the values up because `loadEnv` prefix-matches entries already in
  * `process.env`, which is why the merge has to happen before Vite starts.
  */
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join } from "node:path";
@@ -104,6 +104,30 @@ export function isMainModule(moduleUrl) {
   }
 }
 
+function systemProxy(env) {
+  if (env.HTTPS_PROXY || env.HTTP_PROXY || env.https_proxy || env.http_proxy) {
+    env.NODE_USE_ENV_PROXY = env.NODE_USE_ENV_PROXY || "1";
+    if (!env.NO_PROXY && !env.no_proxy) env.NO_PROXY = "localhost,127.0.0.1";
+    return;
+  }
+  if (process.platform !== "win32") return;
+  try {
+    const out = execFileSync("reg", ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"], { encoding: "utf8" });
+    if (!/ProxyEnable\s+REG_DWORD\s+0x1\b/i.test(out)) return;
+    const server = /ProxyServer\s+REG_SZ\s+(\S+)/i.exec(out)?.[1] ?? "";
+    const https = /https=([^;]+)/i.exec(server)?.[1];
+    const chosen = https || (server.includes("=") ? "" : server);
+    if (!chosen) return;
+    const proxy = /^https?:\/\//i.test(chosen) ? chosen : `http://${chosen}`;
+    env.HTTPS_PROXY = proxy;
+    env.HTTP_PROXY = proxy;
+    env.NO_PROXY = env.NO_PROXY || env.no_proxy || "localhost,127.0.0.1";
+    env.NODE_USE_ENV_PROXY = "1";
+  } catch {
+    return;
+  }
+}
+
 function main(argv) {
   const [command, ...args] = argv;
   if (!command) {
@@ -111,6 +135,7 @@ function main(argv) {
     process.exit(2);
   }
   const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
+  systemProxy(env);
   // Windows 上 vite 是 vite.cmd，不经过 shell 找不到。
   const child =
     process.platform === "win32"

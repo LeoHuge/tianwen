@@ -1,3 +1,4 @@
+import { locate, subjectsOf, type Track } from "./fields";
 import type { Instrument } from "./instrument";
 import { DEFAULT_PLAN, sanitize, type SamplePlan } from "./sample-size";
 
@@ -28,7 +29,16 @@ export type Order = {
   projectId?: string;
 };
 
-export type Paradigm = "定量" | "定性";
+export type Paradigm = "定量" | "定性" | "文本分析" | "元分析";
+
+export type ToolKind = "scale" | "interview" | "text" | "meta";
+
+export function instrumentKind(paradigm: "" | Paradigm): ToolKind {
+  if (paradigm === "定性") return "interview";
+  if (paradigm === "文本分析") return "text";
+  if (paradigm === "元分析") return "meta";
+  return "scale";
+}
 
 /** 研究对象拆成几格：在哪、是谁、年龄或身份、状态或经历，另加选填的时间与排除。 */
 export type SubjectParts = {
@@ -62,9 +72,13 @@ export type HotHit = {
   indexes: string[];
   journal: string;
   year: string;
+  theme: string;
+  method: string;
+  variables: string;
+  population: string;
 };
 
-/** 题目的组成要素。定量：iv 自变量、dv 因变量、mechanism 中介或调节。定性：iv 情境或实践、dv 要理解的现象。 */
+/** 题目的组成要素。定量：iv 自变量、dv 因变量、mechanism 中介或调节。定性：iv 情境或实践、dv 要理解的现象。文本分析：iv 理论视角、object 文本、dv 要分析的现象。 */
 export type TopicParts = {
   object: string;
   iv: string;
@@ -106,10 +120,13 @@ export type Project = {
   subjectParts: SubjectParts;
   legacySubject: string;
   unit: string;
+  track: Track;
+  category: string;
+  branch: string;
   discipline: string;
   field: string;
   paradigm: "" | Paradigm;
-  instrument: "scale" | "interview";
+  instrument: ToolKind;
   tier: "buyout" | "revise3";
   hotHits: HotHit[];
   hotKey: string;
@@ -160,6 +177,9 @@ export function blankProject(): Project {
     subjectParts: { ...BLANK_SUBJECT },
     legacySubject: "",
     unit: "社区",
+    track: "研究生",
+    category: "法学",
+    branch: "",
     discipline: "社会学",
     field: "组织与劳动",
     paradigm: "",
@@ -211,7 +231,18 @@ export function normalizeProject(raw: unknown): Project {
     : [];
   const topic =
     data.topic && typeof data.topic === "object" && (data.topic as ChosenTopic).parts ? (data.topic as ChosenTopic) : null;
-  const paradigm = data.paradigm === "定量" || data.paradigm === "定性" ? data.paradigm : "";
+  const paradigm = data.paradigm === "定量" || data.paradigm === "定性" || data.paradigm === "文本分析" || data.paradigm === "元分析" ? data.paradigm : "";
+  const track = data.track === "本科" || data.track === "研究生" ? data.track : "研究生";
+  const discipline = text("discipline", base.discipline);
+  const found = locate(track, discipline);
+  const storedCategory = text("category", "");
+  const storedBranch = track === "本科" ? text("branch", "") : "";
+  let category = found ? found.category : storedCategory;
+  let branch = found ? found.branch : storedBranch;
+  if (!found && category && !subjectsOf(track, category, branch).some((item) => item.name === discipline)) {
+    category = "";
+    branch = "";
+  }
   return {
     ...base,
     id: text("id", base.id),
@@ -221,10 +252,13 @@ export function normalizeProject(raw: unknown): Project {
     subjectParts,
     legacySubject: hasParts ? text("legacySubject", "") : text("legacySubject", "") || text("subject", ""),
     unit: text("unit", base.unit),
-    discipline: text("discipline", base.discipline),
+    track,
+    category,
+    branch,
+    discipline,
     field: text("field", base.field),
     paradigm,
-    instrument: paradigm === "定性" ? "interview" : "scale",
+    instrument: paradigm === "定性" ? "interview" : paradigm === "文本分析" ? "text" : paradigm === "元分析" ? "meta" : "scale",
     tier: data.tier === "buyout" ? "buyout" : "revise3",
     hotHits: Array.isArray(data.hotHits) ? (data.hotHits as HotHit[]).map(fillHit) : [],
     hotKey: text("hotKey", ""),
@@ -256,5 +290,9 @@ function fillHit(hit: HotHit): HotHit {
     indexes: Array.isArray(hit.indexes) ? hit.indexes : [],
     journal: hit.journal ?? "",
     year: hit.year ?? "",
+    theme: hit.theme ?? "",
+    method: hit.method ?? "",
+    variables: hit.variables ?? "",
+    population: hit.population ?? "",
   };
 }

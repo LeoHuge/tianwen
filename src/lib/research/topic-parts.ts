@@ -1,4 +1,5 @@
-import { shortObject, subjectSentence, titleObject } from "./subject";
+import { shortObject, subjectSentence, textObject, titleObject } from "./subject";
+import { TEXT_PARADIGMS, textParadigm, textPatternIds } from "./text-paradigms";
 import type { Candidate, ChosenTopic, Paradigm, SubjectParts, TopicAlt, TopicParts } from "./types";
 
 export const BANNED = /浅析|浅谈|现状|对策|探析|探究|研究综述|创新路径|若干思考|刍议/;
@@ -64,6 +65,22 @@ export const PATTERNS: Pattern[] = [
     needs: ["dv"],
     make: (p) => `${p.object}的${p.dv}${p.iv ? `：基于${p.iv}的质性考察` : ""}`,
   },
+  {
+    id: "meta",
+    label: "X 与 Y 关系的元分析",
+    paradigm: "元分析",
+    needs: ["iv", "dv"],
+    make: (p) => `${p.iv}与${p.dv}关系的元分析${p.mechanism ? `：${p.mechanism}的作用` : ""}`,
+  },
+  ...TEXT_PARADIGMS.map(
+    (item): Pattern => ({
+      id: item.id,
+      label: item.label,
+      paradigm: "文本分析",
+      needs: ["object", "dv"],
+      make: item.make,
+    }),
+  ),
 ];
 
 /** 模型写的题目没有句式编号，按题目里写的「中介」「调节」认回来。 */
@@ -94,6 +111,12 @@ export function patternFits(patternId: string, parts: TopicParts) {
 
 export function makeQuestion(parts: TopicParts, paradigm: Paradigm, subject: string) {
   const who = subject || parts.object || "研究对象";
+  if (paradigm === "文本分析") {
+    return `从${parts.object || who || "这份文本"}抽出${parts.dv || "要分析的现象"}，按${parts.iv || "所选范式"}的类目归类，每个判断都要能回到原文位置。`;
+  }
+  if (paradigm === "元分析") {
+    return `已发表研究里，${parts.iv || "这一条件"}与${parts.dv || "这一结果"}的效应是否同方向？${parts.mechanism ? `${parts.mechanism}是否改变这一关系？` : ""}合并效应在摘录完成之后计算。`;
+  }
   if (paradigm === "定性") {
     return `${who}在${parts.iv || "日常处境"}中，是怎样经历和理解${parts.dv || "这件事"}的？这一过程${
       parts.mechanism ? `与${parts.mechanism}有什么关联` : "受到哪些人和规则的影响"
@@ -122,7 +145,7 @@ export type TopicSeed = {
   discipline: string;
   field: string;
   paradigm: Paradigm;
-  hits: { name: string; source: string }[];
+  hits: { name: string; source: string; theme?: string; method?: string; variables?: string; population?: string }[];
 };
 
 function splitKeywords(seed: TopicSeed) {
@@ -136,14 +159,124 @@ function splitKeywords(seed: TopicSeed) {
   return { pool, dv, others, outcomes };
 }
 
+function phraseList(value: string | undefined) {
+  return (value ?? "")
+    .split(/[、，,；;/]/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2 && item.length <= 12);
+}
+
+function clip(value: string, max: number) {
+  return value.trim().slice(0, max);
+}
+
+function corpusBrief(hits: TopicSeed["hits"]) {
+  return hits
+    .slice(0, 3)
+    .map((hit) => {
+      const name = clip(hit.name, 18);
+      const did = hit.method && hit.theme ? `用${clip(hit.method, 8)}看${clip(hit.theme, 12)}` : clip(hit.theme || hit.method || hit.variables || "", 16);
+      return `「${name}」${did ? did : ""}`;
+    })
+    .join("；");
+}
+
+function fitQuestion(brief: string, gap: string) {
+  const tail = gap.trim();
+  const room = Math.max(24, 180 - tail.length - 1);
+  return `${brief.slice(0, room)}。${tail}`.slice(0, 180);
+}
+
+/** 三个题分别从方法、变量、研究对象上对照整组检索结果，不把四个关键词重新搭配。 */
+function literaturePlans(seed: TopicSeed, object: string, short: string, dv: string, method: string, variant: number) {
+  const hits = seed.hits.filter((hit) => hit.name && (hit.theme || hit.method || hit.variables || hit.population));
+  if (!hits.length) return null;
+  const keywords = new Set(seed.keywords);
+  const variables = [...new Set(hits.flatMap((hit) => phraseList(hit.variables)))].filter((item) => !keywords.has(item));
+  const methods = [...new Set(hits.map((hit) => hit.method).filter((item): item is string => Boolean(item)))];
+  const populations = [...new Set(hits.map((hit) => hit.population).filter((item): item is string => Boolean(item)))];
+  const pool = variables.length ? variables : hits.map((hit) => clip(hit.theme || hit.name, 10)).filter(Boolean);
+  const at = (index: number) => (pool.length ? pool[(variant + index) % pool.length] : "") || dv;
+  const iv = clip(at(0), 10);
+  const second = clip(at(1), 10);
+  const third = clip(at(2), 10);
+  const who = short || object;
+  const covered = corpusBrief(hits);
+  const sentence = subjectSentence(seed.subject, false) || who;
+  const ownMethod = method || (seed.paradigm === "定量" ? "问卷调查" : "深度访谈");
+  const plans = [
+    {
+      parts: { object: method ? who : object, iv, dv, mechanism: second === iv ? "" : second, method },
+      pattern: seed.paradigm === "定量" ? (second !== iv ? "effect-med" : "effect") : "q-shape",
+      question: fitQuestion(covered, `方法集中在${methods.join("、") || "既有做法"}，还没有用${ownMethod}看${sentence}里的${dv}。`),
+      hit: hits[0]!,
+    },
+    {
+      parts: { object, iv: second, dv, mechanism: third !== second ? third : "", method: "" },
+      pattern: seed.paradigm === "定量" ? "relation" : "q-view",
+      question: fitQuestion(covered, `${second}已经出现在这些研究里，还没有放在${sentence}上，和${dv}一起看。`),
+      hit: hits[Math.min(1, hits.length - 1)]!,
+    },
+    {
+      parts: { object: method ? who : object, iv: third, dv, mechanism: "", method },
+      pattern: seed.paradigm === "定量" ? "relation" : "q-view",
+      question: fitQuestion(covered, `对象写的是${populations.join("、") || "其他人群"}，还没有落到${sentence}。`),
+      hit: hits[Math.min(2, hits.length - 1)]!,
+    },
+  ];
+  return plans;
+}
+
 function defaultMethod(seed: TopicSeed) {
   const where = seed.subject.where.trim();
   if (!where) return "";
   return seed.paradigm === "定量" ? `基于${where}的问卷调查` : `基于${where}的深度访谈`;
 }
 
+function textCandidates(seed: TopicSeed, variant: number): Candidate[] {
+  const object = clip(textObject(seed.subject) || "这份文本", 18);
+  const words = seed.keywords.map((word) => word.trim()).filter((word) => word.length >= 2 && !object.includes(word));
+  const theory = /目的论|归化|异化|生态|话语分析|符号学|细读|语料|框架分析|内容分析|互文/;
+  const dv =
+    words.find((word) => /文化负载|隐喻|意象|叙事/.test(word)) ||
+    words.find((word) => /词$/.test(word) && !theory.test(word)) ||
+    words.find((word) => !theory.test(word)) ||
+    words[words.length - 1] ||
+    "文本现象";
+  const blob = `${seed.keywords.join("")}${object}${seed.subject.who}${seed.discipline}${seed.field}`;
+  const names = seed.hits
+    .slice(0, 3)
+    .map((item) => item.name)
+    .filter(Boolean);
+  return textPatternIds(blob, variant).map((id, index) => {
+    const guide = textParadigm(id);
+    const parts: TopicParts = { object, iv: guide.lens, dv, mechanism: "", method: "" };
+    const title = composeTitle(parts, id, "文本分析");
+    const lead = names.length ? `已检索到${names.map((name) => `「${clip(name, 16)}」`).join("、")}。` : "";
+    return {
+      title,
+      question: `${lead}从${object}抽出${dv}。${guide.work}`.slice(0, 180),
+      basis: names.length
+        ? `用${guide.label}。对照${names.map((name) => `「${name}」`).join("、")}，看这些研究处理过什么文本，再落到你这份文本上。`
+        : `用${guide.label}。按你写的文本和关键词整理。`,
+      hitName: seed.hits[index]?.name ?? seed.hits[0]?.name ?? "",
+      paradigm: "文本分析" as const,
+      parts,
+      alt: {
+        object: unique([object, seed.subject.who.trim()].filter(Boolean)),
+        iv: TEXT_PARADIGMS.map((item) => item.lens).filter((item) => item && item !== guide.lens).slice(0, 3),
+        dv: words.filter((word) => word !== dv).slice(0, 3),
+        mechanism: guide.cats.slice(0, 3),
+      },
+      pattern: id,
+      source: "rules" as const,
+    };
+  });
+}
+
 /** 模型出不来时用规则出 3 个题。三个题的变量组合和问法彼此不同；variant 换一种组合，用于「换一批」。 */
 export function rulesCandidates(seed: TopicSeed, variant = 0): Candidate[] {
+  if (seed.paradigm === "文本分析") return textCandidates(seed, variant);
   const object = titleObject(seed.subject) || seed.subject.who.trim() || "研究对象";
   // 副标题里已经写了地点时，主标题只写人群，避免同一个地名出现两次。
   const short = shortObject(seed.subject) || object;
@@ -158,8 +291,16 @@ export function rulesCandidates(seed: TopicSeed, variant = 0): Candidate[] {
   const b = others[1] ?? "";
   const c = others[2] ?? "";
   const method = defaultMethod(seed);
-  const plans: { parts: TopicParts; pattern: string }[] =
-    seed.paradigm === "定量"
+  const fromLiterature = literaturePlans(seed, object, short, dv, method, variant);
+  const plans: { parts: TopicParts; pattern: string; question?: string; hit?: TopicSeed["hits"][number] }[] =
+    seed.paradigm === "元分析"
+      ? [
+          { parts: { object: "已发表研究", iv: a, dv, mechanism: b, method: "" }, pattern: "meta" },
+          { parts: { object: "已发表研究", iv: b || a, dv, mechanism: c, method: "" }, pattern: "meta" },
+          { parts: { object: "已发表研究", iv: c || a, dv, mechanism: a, method: "" }, pattern: "meta" },
+        ]
+      : fromLiterature ??
+    (seed.paradigm === "定量"
       ? [
           { parts: { object: method ? short : object, iv: a, dv, mechanism: b, method }, pattern: b ? "effect-med" : "effect" },
           { parts: { object, iv: b || a, dv, mechanism: c || (b ? a : ""), method: "" }, pattern: c || b ? "effect-mod" : "relation" },
@@ -169,7 +310,7 @@ export function rulesCandidates(seed: TopicSeed, variant = 0): Candidate[] {
           { parts: { object: method ? short : object, iv: a, dv, mechanism: b, method }, pattern: "q-shape" },
           { parts: { object, iv: b || a, dv, mechanism: "", method: "" }, pattern: "q-in" },
           { parts: { object: method ? short : object, iv: c || a, dv, mechanism: "", method }, pattern: "q-view" },
-        ];
+        ]);
   const seen = new Set<string>();
   const items: Candidate[] = [];
   plans.forEach((plan, index) => {
@@ -179,11 +320,17 @@ export function rulesCandidates(seed: TopicSeed, variant = 0): Candidate[] {
       title = composeTitle(plan.parts, plan.pattern, seed.paradigm);
     }
     seen.add(title);
-    const hit = seed.hits[index] ?? seed.hits[0];
+    const hit = plan.hit ?? seed.hits[index] ?? seed.hits[0];
+    const names = seed.hits
+      .slice(0, 3)
+      .map((item) => item.name)
+      .filter(Boolean);
     items.push({
       title,
-      question: makeQuestion(plan.parts, seed.paradigm, sentence),
-      basis: hit ? `对应检索方向「${hit.name}」（${hit.source}），按你的关键词与研究对象组合。` : "本轮没有可核对的检索条目，按你的关键词与研究对象组合。",
+      question: plan.question ?? makeQuestion(plan.parts, seed.paradigm, sentence),
+      basis: names.length
+        ? `对照检索结果${names.map((name) => `「${name}」`).join("、")}，从${index === 0 ? "方法" : index === 1 ? "变量" : "研究对象"}上找还没落到你这组对象上的缺口。`
+        : "本轮没有可核对的检索条目，按你的关键词与研究对象组合。",
       hitName: hit?.name ?? "",
       paradigm: seed.paradigm,
       parts: plan.parts,
@@ -213,6 +360,7 @@ export function slotOptions(topic: Candidate, subject: SubjectParts, keywords: s
   const where = subject.where.trim();
   if (key === "object") return unique([topic.parts.object, ...topic.alt.object, titleObject(subject), shortObject(subject)].filter(Boolean));
   if (key === "method") {
+    if (topic.paradigm === "文本分析") return unique([topic.parts.method, ""]);
     const tool = topic.paradigm === "定量" ? "问卷调查" : "深度访谈";
     return unique([topic.parts.method, where ? `基于${where}的${tool}` : "", `基于${tool}的${topic.paradigm === "定量" ? "实证分析" : "质性研究"}`, ""]);
   }
@@ -244,15 +392,30 @@ export function editSuggestions(topic: ChosenTopic, subject: SubjectParts): Sugg
   const parts = topic.parts;
   const list: Suggestion[] = [];
   const current = effectivePattern(topic.pattern, topic.title);
-  const fullObject = titleObject(subject);
+  const fullObject = topic.paradigm === "文本分析" ? textObject(subject) : titleObject(subject);
   if (fullObject && parts.object !== fullObject) {
     list.push({
       id: "object",
-      label: "研究对象换成你写的限定写法",
+      label: topic.paradigm === "文本分析" ? "文本名称换成你写的" : "研究对象换成你写的限定写法",
       detail: `「${parts.object || "（空）"}」→「${fullObject}」`,
       parts: { ...parts, object: fullObject },
       pattern: topic.pattern,
     });
+  }
+  if (topic.paradigm === "文本分析") {
+    for (const item of patternsFor("文本分析")) {
+      if (item.id === current) continue;
+      const guide = textParadigm(item.id);
+      list.push({
+        id: item.id,
+        label: `改用${item.label}`,
+        detail: guide.work,
+        parts: { ...parts, iv: guide.lens, mechanism: "" },
+        pattern: item.id,
+      });
+    }
+    if (parts.method) list.push({ id: "short", label: "去掉副标题", detail: `删去「——${parts.method}」`, parts: { ...parts, method: "" }, pattern: topic.pattern });
+    return list.slice(0, 5);
   }
   if (topic.paradigm === "定量" && parts.mechanism) {
     if (current !== "effect-med")
@@ -327,7 +490,7 @@ export function checkTitle(final: string, base: string, parts: TopicParts) {
   if (distance > TWEAK_LIMIT) problems.push(`小改动了 ${distance} 个字，只能动 ${TWEAK_LIMIT} 个字以内。要大改，请用上面的建议和下拉选项。`);
   if (parts.dv && !title.includes(parts.dv.trim())) problems.push(`题目里要保留「${parts.dv.trim()}」。`);
   const filled = [parts.iv, parts.dv, parts.mechanism].map((word) => word.trim()).filter(Boolean);
-  if (new Set(filled).size < filled.length) problems.push("自变量、因变量和中介（调节）变量不能用同一个词。");
+  if (new Set(filled).size < filled.length) problems.push("题目里的几项不能写成同一个词。");
   return { ok: problems.length === 0, problems, distance };
 }
 

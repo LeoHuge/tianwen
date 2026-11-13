@@ -17,6 +17,9 @@ import type { Candidate, ChosenTopic, Paradigm, SubjectParts, TopicParts } from 
 import { Button, controlClass } from "./primitives";
 
 function slotLabels(paradigm: Paradigm, pattern: string): Record<keyof TopicParts, string> {
+  if (paradigm === "文本分析") {
+    return { object: "文本", iv: "理论视角", dv: "分析现象", mechanism: "类目", method: "副标题" };
+  }
   return paradigm === "定性"
     ? { object: "研究对象", iv: "情境 / 实践", dv: "要理解的现象", mechanism: "关联 / 过程", method: "副标题（数据从哪来）" }
     : {
@@ -61,7 +64,7 @@ export function TopicCard({
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
         <span>选题 {index + 1}</span>
         <span>· {item.paradigm}</span>
-        <span>· {item.source === "model" ? "模型按检索结果生成" : "按规则组合"}</span>
+        <span>· {item.source === "model" ? "按检索结果生成" : item.hitName ? "按检索结果整理" : "按关键词组合"}</span>
       </div>
       <h3 className="mt-2 text-lg leading-8">{item.title}</h3>
       <p className="mt-2 text-sm leading-7 text-ink-soft">{item.question}</p>
@@ -80,7 +83,7 @@ export function LockedTopics({ count }: { count: number }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="sheet relative overflow-hidden p-5" aria-label={`选题 ${index + 1}，付费后显示`}>
+        <div key={index} className="sheet relative overflow-hidden p-5" aria-label={`选题 ${index + 1}，付款后显示`}>
           <p className="text-xs text-muted">选题 {index + 1}</p>
           <div className="mt-3 space-y-2" aria-hidden="true">
             <div className="h-4 w-11/12 bg-line" />
@@ -88,7 +91,7 @@ export function LockedTopics({ count }: { count: number }) {
             <div className="h-3 w-full bg-paper-2" />
             <div className="h-3 w-10/12 bg-paper-2" />
           </div>
-          <p className="mt-3 text-xs text-ink">已生成 · 付费后弹出</p>
+          <p className="mt-3 text-xs text-ink">已生成 · 付款后查看</p>
         </div>
       ))}
     </div>
@@ -113,7 +116,7 @@ export function TopicsReveal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/45 backdrop-blur-[2px]" />
         <Dialog.Content className="sheet fixed top-1/2 left-1/2 z-50 max-h-[92vh] w-[min(100%-2rem,46rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-6">
-          <Dialog.Title className="text-2xl text-ink">你的三个选题</Dialog.Title>
+          <Dialog.Title className="text-2xl text-ink">三个选题</Dialog.Title>
           <Dialog.Description className="mt-1 text-sm leading-7 text-muted">
             选一个，下一步可以按建议修改。没选的也会留在页面上，之后还能换。
           </Dialog.Description>
@@ -266,7 +269,7 @@ export function TopicEditDialog({
           <div className="mt-5 border-t border-line pt-4">
             <p className="text-xs text-muted">改后的题目</p>
             <p className="mt-1 text-lg leading-8 text-ink">{base}</p>
-            {rebuilt ? <p className="mt-1 text-xs text-note">原题里找不到要换的词，已按句式重新组合。</p> : null}
+            {rebuilt ? <p className="mt-1 text-xs text-note">已按句式重新组合。</p> : null}
             <label className="mt-3 block">
               <span className="mb-1 block text-sm text-ink">
                 小改措辞（最多改 {TWEAK_LIMIT} 个字，已改 {check.distance} 个）
@@ -279,7 +282,7 @@ export function TopicEditDialog({
               </p>
             ))}
             <p className="mt-2 text-xs leading-6 text-muted">
-              为什么不能随便改：问卷的变量、筛选题和样本量都从这一题来。大改请用上面的建议和下拉选项，系统会同时检查变量是否还对得上。
+              修改时请先采用上方建议，或在选项中更换用词。问卷的变量、筛选题和样本量都依据这一题目生成，少量措辞调整会同时核对变量是否仍然对应。
             </p>
           </div>
 
