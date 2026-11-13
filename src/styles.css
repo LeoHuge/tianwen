@@ -196,62 +196,19 @@
   letter-spacing: 0.02em;
   animation: poster-pair 6.4s ease-in-out 1.9s infinite;
 }
-.poster-title span:not(.poster-sheen) {
+.poster-title span {
   display: block;
-  background-image: linear-gradient(
-    105deg,
-    #f4f0e6 0%,
-    #f7f1e4 18%,
-    #e8c56a 32%,
-    #fffdf8 44%,
-    #d7e7ee 54%,
-    #f2c4aa 66%,
-    #f4f0e6 82%,
-    #f4f0e6 100%
-  );
-  background-size: 280% 100%;
-  background-repeat: no-repeat;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation:
-    poster-title 1.35s cubic-bezier(0.16, 0.84, 0.24, 1) 0.42s both,
-    poster-glyph 6.4s linear 1.9s infinite;
-}
-.poster-sheen {
-  position: absolute;
-  top: 4%;
-  bottom: 6%;
-  left: 0;
-  width: 34%;
-  background: linear-gradient(100deg, transparent, rgb(255 236 196 / 0%) 12%, rgb(255 248 230 / 72%) 42%, rgb(214 232 238 / 62%) 58%, rgb(242 198 176 / 28%) 70%, transparent 88%);
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: poster-sheen 5.6s ease-in-out 1.7s infinite;
+  color: #f4f0e6;
+  animation: poster-title 1.35s cubic-bezier(0.16, 0.84, 0.24, 1) 0.42s both;
 }
 .poster-rule {
   display: block;
   width: 10.5rem;
   height: 2px;
   margin-top: 22px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    #b8924a 10%,
-    #f3e2b8 24%,
-    #fffaf2 38%,
-    #f0c2a4 50%,
-    #f7fbff 60%,
-    #c5d8e2 72%,
-    #e7c56a 86%,
-    transparent 100%
-  );
-  background-size: 180% 100%;
+  background: #f4f0e6;
   transform-origin: left center;
-  animation:
-    poster-rule 1.35s cubic-bezier(0.22, 0.7, 0.2, 1) 1.05s both,
-    poster-rule-gleam 5.6s linear 2.4s infinite;
+  animation: poster-rule 1.35s cubic-bezier(0.22, 0.7, 0.2, 1) 1.05s both;
 }
 .poster-line {
   max-width: 16em;
@@ -363,31 +320,6 @@
     opacity: 1;
   }
 }
-@keyframes poster-glyph {
-  from {
-    background-position: 80% 50%;
-  }
-  to {
-    background-position: -80% 50%;
-  }
-}
-@keyframes poster-sheen {
-  0%,
-  8% {
-    opacity: 0;
-    transform: translateX(-170%);
-  }
-  22% {
-    opacity: 1;
-  }
-  78% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(430%);
-  }
-}
 @keyframes poster-rule {
   0% {
     transform: scaleX(0);
@@ -402,15 +334,6 @@
     opacity: 0.9;
   }
 }
-@keyframes poster-rule-gleam {
-  from {
-    background-position: 120% 0;
-  }
-  to {
-    background-position: -120% 0;
-  }
-}
-
 @media (max-width: 767px) {
   .poster {
     min-height: 340px;
@@ -435,21 +358,18 @@
   }
   .poster-wash,
   .poster-rule,
-  .poster-sheen,
-  .poster-title {
+  .poster-title,
+  .poster-title span {
     animation: none !important;
   }
   .poster-rule {
     transform: none;
     opacity: 0.95;
   }
-  .poster-sheen {
-    opacity: 0;
-  }
-  .poster-title span:not(.poster-sheen) {
+  .poster-title,
+  .poster-title span {
+    opacity: 1;
     color: #f4f0e6;
-    background: none;
-    -webkit-text-fill-color: #f4f0e6;
   }
   .poster-logo rect,
   .poster-logo path {

@@ -15,7 +15,6 @@ export function Poster() {
         <div className="poster-title">
           <span>开</span>
           <span>题</span>
-          <span className="poster-sheen" />
         </div>
         <span className="poster-rule" />
       </div>
