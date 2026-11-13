@@ -1,5 +1,5 @@
-import { MAIN_MAX, TITLE_MAX } from "./topic-parts";
-import type { Paradigm } from "./types";
+import { composeTitle, MAIN_MAX, TITLE_MAX } from "./topic-parts";
+import type { Paradigm, TopicParts } from "./types";
 
 export type BroughtInput = {
   title: string;
@@ -12,6 +12,7 @@ export type BroughtRewrite = {
   label: string;
   title: string;
   note: string;
+  provisional: boolean;
 };
 
 export type BroughtVerdict = {
@@ -148,15 +149,39 @@ function structuralProblems(title: string, paradigm: Paradigm | "", object: stri
   return problems;
 }
 
-function outcomeHint(text: string) {
-  if (/语文/.test(text)) return "发言、阅读理解或书面表达";
-  if (/数学/.test(text)) return "解题过程、课堂提问或作业表现";
-  if (/英语|外语/.test(text)) return "口语表达、阅读理解或课堂参与";
-  if (/课堂|教学|课程/.test(text)) return "参与、互动或当堂表现";
-  if (/企业|公司|研发/.test(text)) return "投入、创新或绩效中的一项";
-  if (/老年|养老|照料/.test(text)) return "参与、照料或生活安排中的一项";
-  if (/医疗|患者|护士|医师/.test(text)) return "就诊、照护或依从中的一项";
-  return "一个能看见、能记录的表现";
+function practiceOf(method: string) {
+  if (method.endsWith("教学法")) return method.slice(0, -1);
+  if (method.endsWith("法") && method.length > 2) return method.slice(0, -1);
+  return method;
+}
+
+function cohortOf(text: string, objectField: string) {
+  if (objectField && !/课堂|学校|课程/.test(objectField)) return objectField;
+  const who = text.match(WHO)?.[0] ?? "";
+  if (who && !/学校/.test(who)) return who;
+  if (/小学/.test(text)) return "小学生";
+  if (/初中|高中|中学/.test(text)) return "中学生";
+  if (/大学|高校/.test(text)) return "大学生";
+  if (/幼儿/.test(text)) return "幼儿";
+  if (/企业|公司/.test(text)) return "企业";
+  if (/患者|医院/.test(text)) return "患者";
+  if (/老年|养老/.test(text)) return "老年人";
+  if (/课堂|教学|课程/.test(text)) return "学生";
+  return objectField;
+}
+
+function samplePair(text: string) {
+  if (/语文/.test(text)) return { dv: "课堂参与", process: "课堂经验", actor: "小学语文教师", alt: "阅读理解" };
+  if (/数学/.test(text)) return { dv: "解题表现", process: "解题经验", actor: "数学教师", alt: "课堂提问" };
+  if (/英语|外语/.test(text)) return { dv: "口语参与", process: "课堂经验", actor: "英语教师", alt: "阅读理解" };
+  if (/课堂|教学|课程/.test(text)) return { dv: "课堂参与", process: "课堂经验", actor: "任课教师", alt: "学习投入" };
+  if (/研发/.test(text)) return { dv: "研发投入", process: "研发决策", actor: "企业负责人", alt: "创新绩效" };
+  if (/养老|老年|照料/.test(text)) return { dv: "社区参与", process: "照料经验", actor: "照料者", alt: "生活安排" };
+  return null;
+}
+
+function blankParts(): TopicParts {
+  return { object: "", iv: "", dv: "", mechanism: "", method: "" };
 }
 
 function proposals(input: {
@@ -165,42 +190,52 @@ function proposals(input: {
   object: string;
   paradigm: "" | Paradigm;
   emptyPhrase: string;
-  hint: string;
+  title: string;
 }) {
-  const { method, setting, object, emptyPhrase, hint } = input;
-  const thing = method || "【待补：现象】";
-  const place = setting ? `在${setting}，` : "";
-  const who = object || "【待补：上课的教师或学生】";
-  const dropped = emptyPhrase ? `删去「${emptyPhrase}」。` : "删去现状、策略和对策。";
-  const kept = [method, setting].filter(Boolean).map((item) => `「${item}」`).join("和");
-  const quant = `${place}${thing}对【待补：结果】的影响`;
-  const qual = setting ? `${who}如何在${setting}里组织${thing}` : `${who}如何经历${thing}`;
-  const text = `《【待补：一份文本的名称】》中${thing}的内容分析`;
-  const meta = `${thing}与【待补：另一个变量】关系的元分析`;
-  const all: BroughtRewrite[] = [
-    {
-      label: "定量",
-      title: quant,
-      note: `${dropped}保留${kept || "题目里的现象"}，改成条件和结果。结果不要写策略。请收成${hint}中的一项，按您的课题选定。选定之前，不要用这句写方案。`,
-    },
-    {
-      label: "定性",
-      title: qual,
-      note: `${dropped}改成过程，不要写成如何优化或如何提升。方括号换成实际受访者，并写明是哪一种课或哪一种情境。`,
-    },
-    {
-      label: "文本分析",
-      title: text,
-      note: "只有材料已经是一份课文、课堂实录或教案时才用。书名号里写那一份文本的名称，结论停在这一份文本。",
-    },
-    {
-      label: "元分析",
-      title: meta,
-      note: "只有准备综合已经发表、并且报告了效应量的研究时才用。两个变量都要写进题目。合并效应等摘录完成后再计算。",
-    },
-  ];
-  if (input.paradigm) return all.filter((item) => item.label === input.paradigm);
-  return all.filter((item) => item.label === "定量" || item.label === "定性");
+  const { method, setting, object, emptyPhrase, title } = input;
+  const blob = `${title}${setting}${object}`;
+  const iv = practiceOf(method) || method;
+  const who = cohortOf(blob, object);
+  const sample = samplePair(blob);
+  const dropped = emptyPhrase ? `删去「${emptyPhrase}」。` : "";
+  const all: BroughtRewrite[] = [];
+  if (iv && who && sample) {
+    all.push({
+      label: "定量 · X对Y的影响",
+      title: composeTitle({ ...blankParts(), iv, object: who, dv: sample.dv }, "effect", "定量"),
+      provisional: true,
+      note: `${dropped}句式是「自变量对研究对象的因变量的影响」，横截面写成关联。「${sample.dv}」是示例因变量。若您测的不是这项，只换成「${sample.alt}」或您自己的结果，不要改回现状或策略。`,
+    });
+    const actor = /教师|老师/.test(blob) ? who : sample.actor;
+    all.push({
+      label: "定性 · X如何形塑Y",
+      title: composeTitle({ ...blankParts(), iv, object: actor, dv: sample.process }, "q-shape", "定性"),
+      provisional: true,
+      note: `${dropped}句式是「情境如何形塑对象的经验」，写过程，不写优化策略。「${sample.process}」是示例。若访谈的不是${actor}，只换对象这一个词。`,
+    });
+  }
+  const book = /《[^》]{1,40}》/.exec(blob)?.[0];
+  if (book && (sample || method)) {
+    all.push({
+      label: "文本分析 · 一份文本的内容分析",
+      title: composeTitle({ ...blankParts(), object: book, dv: sample?.process || method, iv: "内容分析" }, "content", "文本分析"),
+      provisional: false,
+      note: "一份文本、一个现象。结论停在这一份文本，不写成该类文本的全体。",
+    });
+  }
+  if (iv && sample && (input.paradigm === "元分析" || title.includes("元分析"))) {
+    all.push({
+      label: "元分析 · X与Y关系的元分析",
+      title: composeTitle({ ...blankParts(), iv, dv: sample.dv }, "meta", "元分析"),
+      provisional: true,
+      note: "分析单位是已经发表、并且报告了效应量的研究。合并效应在摘录之后计算，不写进题目。",
+    });
+  }
+  if (input.paradigm === "定量") return all.filter((item) => item.label.startsWith("定量"));
+  if (input.paradigm === "定性") return all.filter((item) => item.label.startsWith("定性"));
+  if (input.paradigm === "文本分析") return all.filter((item) => item.label.startsWith("文本"));
+  if (input.paradigm === "元分析") return all.filter((item) => item.label.startsWith("元分析"));
+  return all.filter((item) => item.label.startsWith("定量") || item.label.startsWith("定性"));
 }
 
 function writePlan(input: {
@@ -338,23 +373,20 @@ export function judgeBroughtTopic(input: BroughtInput): BroughtVerdict {
   const cleanedReady = Boolean(cleaned && cleaned !== title && cleanedShape && cleanedShape.length === 0 && cleanedBanned.length === 0 && cleanedParadigm);
 
   const quoted = reading.hits[0] || bannedHits.join("、");
-  const hint = outcomeHint(`${title}${object}`);
   if (reading.hits.length > 0 || bannedHits.length > 0) {
     if (cleanedReady) {
       problems.push(`「${quoted}」贴在一句已经成立的题目后面，没有增加内容。删掉即可，不要把策略或对策加回去。`);
     } else {
       problems.push(`「${quoted}」把题目写成了调查现状，再提出办法。现状不是研究问题，策略和对策是还没做出来的结论，这两处都要删。`);
       if (method && setting) {
-        problems.push(`「${method}」和「${setting}」仍是两个大范围。题目还没有收成一次可以做完的研究：谁，以及要看的一个结果，或一节课里怎样做。`);
+        problems.push(`「${method}」和「${setting}」仍是两个大范围，还没有收成一次可以做完的研究。`);
       } else if (reading.substance) {
-        problems.push(`留下的「${reading.substance}」还太宽。要补上是谁，以及要看的结果或过程。`);
+        problems.push(`留下的「${reading.substance}」还太宽。要补上研究对象，以及一个结果或一段经验。`);
       }
-      problems.push(`读者看不出结果。若做问卷，结果要收成${hint}中的一项，由您按课题选定。若做访谈，要写成谁怎样做，不要写成如何优化。`);
+      problems.push("它不是「自变量对研究对象的因变量的影响」，也不是「情境如何形塑对象的经验」。现状和策略不能充当变量。");
       revisions.push(`删去「${quoted}」。不要把策略、路径、对策写回题目。`);
-      if (method || setting) {
-        revisions.push(`保留${[method, setting].filter(Boolean).map((item) => `「${item}」`).join("和")}。`);
-      }
-      revisions.push("补上一个结果，或补上谁在具体场景里怎样做。地点、年级或机构在开题里写明。");
+      if (method || setting) revisions.push(`保留${[method, setting].filter(Boolean).map((item) => `「${item}」`).join("和")}。`);
+      revisions.push("按下面的句式重写。示例词只替换那一个，不要改句式。");
     }
   }
 
@@ -374,18 +406,20 @@ export function judgeBroughtTopic(input: BroughtInput): BroughtVerdict {
         label: cleanedParadigm,
         title: cleaned,
         note: `删去「${quoted}」。条件和结果都还在，这句可以再评判。不要把对策或策略加回去。`,
+        provisional: false,
       },
     ];
   } else if (reading.hits.length > 0 && reading.substance) {
-    rewrites = proposals({ method, setting, object, paradigm: input.paradigm, emptyPhrase: quoted, hint });
+    rewrites = proposals({ method, setting, object, paradigm: input.paradigm, emptyPhrase: quoted, title });
   } else if (/导致|造成/.test(title)) {
     const swapped = title.replace(/导致|造成/g, "对");
     const cause = /导致|造成/.exec(title)?.[0] ?? "导致";
     problems.push(`「${cause}」把一次调查写成了已经确定的因果。横截面问卷只能写关联。`);
     rewrites = [
       {
-        label: "定量",
+        label: "定量 · X对Y的影响",
         title: swapped.endsWith("的影响") ? swapped : `${swapped}的影响`,
+        provisional: false,
         note: `把「${cause}」改成「对……的影响」。若有中介或调节，用冒号写出那个变量，不要写成策略。`,
       },
     ];

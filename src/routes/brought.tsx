@@ -99,6 +99,7 @@ function BroughtPage() {
                 setTitle(next);
                 setVerdict(judgeBroughtTopic({ title: next, paradigm, object, discipline }));
               }}
+              onDraft={(next) => setTitle(next)}
             />
           ) : null}
         </div>
@@ -111,10 +112,12 @@ function VerdictView({
   verdict,
   onDownload,
   onUse,
+  onDraft,
 }: {
   verdict: BroughtVerdict;
   onDownload: () => void;
   onUse: (title: string) => void;
+  onDraft: (title: string) => void;
 }) {
   return (
     <section className="mt-10 border-t border-line pt-8" aria-live="polite">
@@ -157,8 +160,13 @@ function VerdictView({
                     <p className="text-xs tracking-widest text-brass">{item.label}</p>
                     <p className="mt-2 font-serif text-lg leading-8">{item.title}</p>
                     <p className="mt-2 text-sm leading-7 text-ink-soft">{item.note}</p>
-                    <Button type="button" tone="ghost" className="mt-3" onClick={() => onUse(item.title)}>
-                      用这句再评判
+                    <Button
+                      type="button"
+                      tone="ghost"
+                      className="mt-3"
+                      onClick={() => (item.provisional ? onDraft(item.title) : onUse(item.title))}
+                    >
+                      {item.provisional ? "放进题目，改完再评判" : "用这句再评判"}
                     </Button>
                   </div>
                 ))}
