@@ -8,6 +8,7 @@ import { exampleProject } from "@/lib/research/example";
 import { directionsOf, type Track } from "@/lib/research/fields";
 import { homeExample, metaMaterial, paradigmExampleTitle, textMaterial } from "@/lib/research/home-examples";
 import { useLedger } from "@/lib/research/store";
+import { isStaticPreview } from "@/lib/research/static-preview";
 import { checkSubject, META_SLOTS, SUBJECT_SLOTS, subjectSentence, TEXT_SLOTS } from "@/lib/research/subject";
 import { BLANK_SUBJECT, blankProject, instrumentKind, type Paradigm, type SubjectParts } from "@/lib/research/types";
 
@@ -174,7 +175,9 @@ function Home() {
             写成一份可以实施的开题
           </h1>
           <p className="mt-5 max-w-xl text-base leading-8 text-ink-soft">
-            请先选择研究范式，再按目录选择学科，然后填写四个关键词和研究对象。定量出问卷，定性出访谈提纲，文本分析出分类框架，元分析出摘录表。我们检索 2021 年以来的中文期刊、外文期刊，以及国家社科基金、国家自然科学基金立项，给出 3 个具体题目。开题包 ¥199，付款后即可查看，并按建议修改。若还需要问卷、访谈提纲、文本分析框架、摘录表或初稿，再支付差额。
+            {isStaticPreview()
+              ? "请先选择研究范式，再按目录选择学科，然后填写四个关键词和研究对象。定量出问卷，定性出访谈提纲，文本分析出分类框架，元分析出摘录表。公开网页不检索，检索结果空着。题目按关键词组成。开题包 ¥199，确认后可查看，并按建议修改。若还需要问卷、访谈提纲、文本分析框架、摘录表或初稿，再支付差额。"
+              : "请先选择研究范式，再按目录选择学科，然后填写四个关键词和研究对象。定量出问卷，定性出访谈提纲，文本分析出分类框架，元分析出摘录表。我们检索 2021 年以来的中文期刊、外文期刊，以及国家社科基金、国家自然科学基金立项，给出 3 个具体题目。开题包 ¥199，付款后即可查看，并按建议修改。若还需要问卷、访谈提纲、文本分析框架、摘录表或初稿，再支付差额。"}
           </p>
 
           <div className="sheet mt-8">

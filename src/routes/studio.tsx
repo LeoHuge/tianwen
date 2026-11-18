@@ -108,6 +108,11 @@ function sameMetaOutcome(titles: string[]) {
   return outcomes.every((item) => item && item === outcomes[0]);
 }
 
+function topicPhrase(count: number) {
+  if (count <= 1) return "一个题目";
+  return `${count} 个题目`;
+}
+
 function StudioPage() {
   const project = useLedger((state) => state.project);
   const orders = useLedger((state) => state.orders);
@@ -277,11 +282,12 @@ function StudioPage() {
       const current = useLedger.getState().project;
       const keywords = current.keywords.map((word) => word.trim());
       const avoid = reroll ? current.candidates.map((item) => item.title) : [];
-      const items = localRules(current, reroll ? current.hotHits : [], avoid).map((item) =>
+      let items = localRules(current, reroll ? current.hotHits : [], avoid).map((item) =>
         item.hitName ? item : { ...item, basis: "公开预览不连接检索。这句按您的关键词组成，不是文献结果。" },
       );
-      if (reroll && items.length === 0) {
-        patchProject({ candidateNote: "这几个关键词再组一次，还是上面三句。这一次没有换掉，次数还留着。" });
+      if ((current.paradigm || "定量") === "元分析") items = items.slice(0, 1);
+      if (reroll && (items.length === 0 || items.every((item) => avoid.includes(item.title)))) {
+        patchProject({ candidateNote: "这几个关键词再组一次，还是上面的题目。这一次没有换掉，次数还留着。" });
         return;
       }
       patchProject({
@@ -538,8 +544,8 @@ function StudioPage() {
             <p className="kicker">开题</p>
             <h1 className="mt-2 font-serif text-3xl leading-snug">从四个词到一份能做的开题</h1>
             <ol className="mt-4 space-y-1.5 text-sm leading-7 text-ink-soft">
-              <li>① 填写关键词和研究对象 ② 检索近五年论文和立项，给出 3 个题目</li>
-              <li>③ 支付开题包 {yuan(TOPIC_FEE)} 后查看三个题目，选定一个并按建议修改</li>
+              <li>① 填写关键词和研究对象 ② {isStaticPreview() ? "公开网页不检索，题目按关键词组成" : "检索近五年论文和立项，给出 3 个题目"}</li>
+              <li>③ {isStaticPreview() ? "确认后查看题目，选定一个并按建议修改" : `支付开题包 ${yuan(TOPIC_FEE)} 后查看三个题目，选定一个并按建议修改`}</li>
               <li>④ 如需问卷、访谈提纲、文本分析框架或摘录表，按差价继续</li>
             </ol>
           </div>
@@ -650,29 +656,37 @@ function StudioPage() {
         </section>
 
         <section id="topics" className="mt-12">
-          <h2 className="text-xl">② 检索并出 3 个题</h2>
+          <h2 className="text-xl">{isStaticPreview() ? "② 出题" : "② 检索并出 3 个题"}</h2>
           <p className="mt-2 text-sm leading-7 text-ink-soft">
             {isStaticPreview()
-              ? "请用这四个关键词检索中国知网、万方、维普和外文数据库，以及国家自然科学基金、国家社科基金。中文按 CSSCI 来源、CSSCI 扩展版、北大核心、AMI 各级和 CSCD 核对。外文按 SSCI、SCIE、SCI、ESCI、EI 分别核对。课题按重大、重点、一般、面上和青年查看。本页同时给出 3 个题目。"
+              ? "检索结果空着。这一页不检索。题目按您填的关键词组成。元分析在没有文献时只给一句，不把同一组词排成几道研究。"
               : "按四个关键词检索 2021 年以来的中文期刊、外文期刊，以及国家社科基金、国家自然科学基金立项。中文标注 CSSCI 来源、CSSCI 扩展版、北大核心、AMI 各级和 CSCD。外文分别标注 SSCI、SCIE、SCI、ESCI 和 EI。课题按国家社科基金、国家自然科学基金，以及重大、重点、一般、面上、青年和西部查看。三个题目对照这些文献的主题、方法、变量和研究对象来写。"}
           </p>
-          <details className="mt-3 text-sm">
-            <summary className="min-h-11 py-2 text-muted underline underline-offset-4">出题所用模型</summary>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {MODELS.map((item) => (
-                <button
-                  key={item.id}
-                  disabled={generating}
-                  className={modelId === item.id ? "min-h-11 border border-ink px-3 text-sm" : "min-h-11 border border-line px-3 text-sm text-muted"}
-                  onClick={() => setModelId(item.id)}
-                >
-                  {item.name}
-                  {item.tier === "premium" ? " · 另行计费" : ""}
-                </button>
-              ))}
+          {isStaticPreview() ? (
+            <div className="mt-4 border border-line">
+              <p className="border-b border-line px-3 py-2 text-sm">检索结果</p>
+              <p className="px-3 py-8 text-sm text-muted">（空）</p>
             </div>
-            <p className="mt-2 text-xs leading-6 text-muted">默认模型即可。若该型号暂不可用，将改用可用型号继续出题。</p>
-          </details>
+          ) : null}
+          {isStaticPreview() ? null : (
+            <details className="mt-3 text-sm">
+              <summary className="min-h-11 py-2 text-muted underline underline-offset-4">出题所用模型</summary>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {MODELS.map((item) => (
+                  <button
+                    key={item.id}
+                    disabled={generating}
+                    className={modelId === item.id ? "min-h-11 border border-ink px-3 text-sm" : "min-h-11 border border-line px-3 text-sm text-muted"}
+                    onClick={() => setModelId(item.id)}
+                  >
+                    {item.name}
+                    {item.tier === "premium" ? " · 另行计费" : ""}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs leading-6 text-muted">默认模型即可。若该型号暂不可用，将改用可用型号继续出题。</p>
+            </details>
+          )}
           {briefIssue && !access.topic ? <p className="mt-3 text-sm text-warn">出题前还差一步：{briefIssue}</p> : null}
           {!access.topic ? (
             <Button className="mt-4" disabled={!ready || generating || Boolean(briefIssue)} onClick={() => void runGenerate(false)}>
@@ -681,9 +695,7 @@ function StudioPage() {
                 : busy === "topic"
                   ? `正在出题 · ${clock(phaseSec)}`
                   : isStaticPreview()
-                    ? candidatesFresh
-                      ? "重新出 3 个题"
-                      : "出 3 个题"
+                    ? "按关键词出题"
                     : candidatesFresh
                       ? "重新检索并出题"
                       : "检索并出 3 个题"}
@@ -712,29 +724,30 @@ function StudioPage() {
               {project.candidateNote ? <p className="mb-3 text-sm text-note">{project.candidateNote}</p> : null}
               {!access.topic && candidatesFresh ? (
                 <div className="border border-ink bg-paper-2 p-4">
-                  <p className="text-base">三个题目已经出好了。</p>
+                  <p className="text-base">{topicPhrase(project.candidates.length)}已经出好了。</p>
                   <p className="mt-1 text-sm leading-7 text-muted">
                     {isStaticPreview()
-                      ? "点击即可查看三个题目。记录保存在这台浏览器。"
+                      ? "点击即可查看。记录保存在这台浏览器。检索结果仍是空的。"
                       : `支付开题包 ${yuan(TOPIC_FEE)} 后即可查看三个题目。题目交付后，该笔费用按购买说明结算。后续研究工具和初稿按差价购买。`}
                   </p>
                   <div className="mt-4">
                     <LockedTopics count={project.candidates.length} />
                   </div>
                   <Button className="mt-4 w-full sm:w-auto" onClick={() => pay("topic")}>
-                    {isStaticPreview() ? "查看三个题目" : `支付开题包 ${yuan(TOPIC_FEE)}，查看三个题目`}
+                    {isStaticPreview() ? "查看题目" : `支付开题包 ${yuan(TOPIC_FEE)}，查看三个题目`}
                   </Button>
                 </div>
               ) : null}
               {access.topic && project.candidates.length ? (
                 <div>
+                  {isStaticPreview() && project.hotHits.length === 0 ? <p className="mb-3 text-sm text-ink-soft">检索结果是空的，所以没有换一批。</p> : null}
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p className="text-sm text-ink">三个题目{project.topic ? "，已选中的以粗框标出" : "，请先选择一个"}</p>
+                    <p className="text-sm text-ink">{topicPhrase(project.candidates.length)}{project.topic ? "，已选中的以粗框标出" : "，请先选择一个"}</p>
                     <div className="flex flex-wrap gap-3 text-sm">
                       <button className="min-h-11 text-cinnabar underline underline-offset-4" onClick={() => setRevealOpen(true)}>
-                        查看三个题目
+                        查看题目
                       </button>
-                      {!topicLocked ? (
+                      {!topicLocked && project.hotHits.length > 0 ? (
                         <button
                           className="min-h-11 text-cinnabar underline underline-offset-4 disabled:text-muted disabled:no-underline"
                           disabled={rerollsLeft <= 0 || generating}
@@ -762,7 +775,7 @@ function StudioPage() {
                 <div className="border border-line bg-paper-2 p-4 text-sm">
                   <p>开题包已付，但这个项目还没出题。</p>
                   <Button className="mt-3" disabled={generating || Boolean(briefIssue)} onClick={() => void runGenerate(false)}>
-                    {busy ? `正在出题 · ${clock(phaseSec)}` : "检索并出 3 个题"}
+                    {busy ? `正在出题 · ${clock(phaseSec)}` : isStaticPreview() ? "按关键词出题" : "检索并出 3 个题"}
                   </Button>
                 </div>
               ) : null}

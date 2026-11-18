@@ -8,6 +8,7 @@ const LINKS = [
   { to: "/brought", label: "自带题目" },
   { to: "/pricing", label: "价格" },
   { to: "/risks", label: "学术规范" },
+  { to: "/mine", label: "我的" },
 ] as const;
 
 function NavLinks() {
@@ -91,6 +92,7 @@ export function Shell({ children, plain = false }: { children: ReactNode; plain?
             <p className="flex max-w-xl flex-wrap gap-x-5">
               <Link to="/risks">学术规范</Link>
               <Link to="/pricing">价格</Link>
+              <Link to="/mine">我的</Link>
               <Link to="/orders">订单</Link>
             </p>
           </div>

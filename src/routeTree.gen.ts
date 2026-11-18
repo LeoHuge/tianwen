@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BroughtRouteImport } from './routes/brought'
 import { Route as CodeRouteImport } from './routes/code'
+import { Route as MineRouteImport } from './routes/mine'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as RisksRouteImport } from './routes/risks'
@@ -30,6 +31,11 @@ const BroughtRoute = BroughtRouteImport.update({
 const CodeRoute = CodeRouteImport.update({
   id: '/code',
   path: '/code',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MineRoute = MineRouteImport.update({
+  id: '/mine',
+  path: '/mine',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersRoute = OrdersRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/brought': typeof BroughtRoute
   '/code': typeof CodeRoute
+  '/mine': typeof MineRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/risks': typeof RisksRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/brought': typeof BroughtRoute
   '/code': typeof CodeRoute
+  '/mine': typeof MineRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/risks': typeof RisksRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/brought': typeof BroughtRoute
   '/code': typeof CodeRoute
+  '/mine': typeof MineRoute
   '/orders': typeof OrdersRoute
   '/pricing': typeof PricingRoute
   '/risks': typeof RisksRoute
@@ -84,14 +93,30 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/brought' | '/code' | '/orders' | '/pricing' | '/risks' | '/studio'
+    | '/'
+    | '/brought'
+    | '/code'
+    | '/mine'
+    | '/orders'
+    | '/pricing'
+    | '/risks'
+    | '/studio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/brought' | '/code' | '/orders' | '/pricing' | '/risks' | '/studio'
+  to:
+    | '/'
+    | '/brought'
+    | '/code'
+    | '/mine'
+    | '/orders'
+    | '/pricing'
+    | '/risks'
+    | '/studio'
   id:
     | '__root__'
     | '/'
     | '/brought'
     | '/code'
+    | '/mine'
     | '/orders'
     | '/pricing'
     | '/risks'
@@ -102,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BroughtRoute: typeof BroughtRoute
   CodeRoute: typeof CodeRoute
+  MineRoute: typeof MineRoute
   OrdersRoute: typeof OrdersRoute
   PricingRoute: typeof PricingRoute
   RisksRoute: typeof RisksRoute
@@ -129,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/code'
       fullPath: '/code'
       preLoaderRoute: typeof CodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mine': {
+      id: '/mine'
+      path: '/mine'
+      fullPath: '/mine'
+      preLoaderRoute: typeof MineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -166,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BroughtRoute: BroughtRoute,
   CodeRoute: CodeRoute,
+  MineRoute: MineRoute,
   OrdersRoute: OrdersRoute,
   PricingRoute: PricingRoute,
   RisksRoute: RisksRoute,
