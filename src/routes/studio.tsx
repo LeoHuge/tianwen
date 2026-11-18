@@ -102,6 +102,12 @@ function scrollTo(id: string) {
   window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
 }
 
+function sameMetaOutcome(titles: string[]) {
+  if (titles.length < 2) return false;
+  const outcomes = titles.map((title) => /与(.{2,24}?)关系的元分析/.exec(title)?.[1] ?? "");
+  return outcomes.every((item) => item && item === outcomes[0]);
+}
+
 function StudioPage() {
   const project = useLedger((state) => state.project);
   const orders = useLedger((state) => state.orders);
@@ -133,7 +139,8 @@ function StudioPage() {
   const briefIssue = briefProblem(project, vague, subjectCheck);
   const briefKey = briefKeyOf(project);
   const candidatesFresh = project.candidates.length > 0 && project.candidateKey === briefKey;
-  const rerollsLeft = Math.max(0, 1 - project.rerolls);
+  const rerollAllowance = project.paradigm === "元分析" && sameMetaOutcome(project.candidates.map((item) => item.title)) ? 2 : 1;
+  const rerollsLeft = Math.max(0, rerollAllowance - project.rerolls);
   const topicLocked = access.instrument;
   // 付过开题包且本项目已经出了题，题目依据的信息就锁定。
   const briefLocked = access.topic && project.candidates.length > 0;
@@ -270,14 +277,20 @@ function StudioPage() {
       const current = useLedger.getState().project;
       const keywords = current.keywords.map((word) => word.trim());
       const avoid = reroll ? current.candidates.map((item) => item.title) : [];
-      const items = localRules(current, reroll ? current.hotHits : [], avoid);
+      const items = localRules(current, reroll ? current.hotHits : [], avoid).map((item) =>
+        item.hitName ? item : { ...item, basis: "公开预览不连接检索。这句按您的关键词组成，不是文献结果。" },
+      );
+      if (reroll && items.length === 0) {
+        patchProject({ candidateNote: "这几个关键词再组一次，还是上面三句。这一次没有换掉，次数还留着。" });
+        return;
+      }
       patchProject({
         hotHits: reroll ? current.hotHits : [],
         hotKey: keywords.join("|"),
         searchNote: "",
         candidates: items,
         candidateKey: briefKeyOf(useLedger.getState().project),
-        candidateNote: "",
+        candidateNote: "公开预览不连接检索。题目按您填的关键词组成，不是文献结果，也不是上一轮检索留下的缓存。",
         rerolls: reroll ? current.rerolls + 1 : current.rerolls,
       });
       if (reroll) setRevealOpen(true);
@@ -356,6 +369,11 @@ function StudioPage() {
         if (items.length >= 3) break;
         items.push(item);
       }
+    }
+    if (reroll && (items.length === 0 || items.every((item) => avoid.includes(item.title)))) {
+      patchProject({ candidateNote: "这一次没有组成新题目，上面三句还留着。次数还留着。" });
+      setBusy(null);
+      return;
     }
     patchProject({
       candidates: items,

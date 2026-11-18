@@ -50,7 +50,7 @@ function BroughtPage() {
           <p className="kicker">自带题目</p>
           <h1 className="mt-3 font-serif text-4xl leading-snug">先看这道题目能不能做</h1>
           <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-soft">
-            把已经写好的题目贴在这里。评判先读出题目里已有的场所和现象，再指出要改的词。合格后给出研究方案和研究计划。不合格时给出用原词改写的题目。
+            把已经写好的题目贴在这里。评判先读出题目里已有的场所和现象，再指出要改的词。合格后给出研究方案和研究计划。不合格时给出改写和一条示范，用改后的句子再评判，合格后才往下写。
           </p>
 
           <div className="mt-8 space-y-5">
@@ -181,6 +181,19 @@ function VerdictView({
                   <li key={item}>{item}</li>
                 ))}
               </ul>
+            </div>
+          ) : null}
+          {verdict.demo ? (
+            <div>
+              <h3 className="text-lg">示范</h3>
+              <div className="mt-3 border border-line bg-sheet px-4 py-4">
+                <p className="font-serif text-lg leading-8">{verdict.demo.title}</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-7 text-ink">
+                  {verdict.demo.lines.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           ) : null}
         </div>

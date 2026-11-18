@@ -274,6 +274,30 @@ function textCandidates(seed: TopicSeed, variant: number): Candidate[] {
   });
 }
 
+function metaPlans(pool: string[], variant: number) {
+  const words = pool.filter((word) => word.length >= 2);
+  const outcomes = words.filter((word) => OUTCOME.test(word));
+  const predictors = words.filter((word) => !OUTCOME.test(word));
+  const cycle = [...outcomes, ...predictors];
+  const blank = { object: "已发表研究", iv: "", dv: "", mechanism: "", method: "" };
+  if (cycle.length < 2) {
+    return [{ parts: { ...blank, iv: cycle[0] ?? "" }, pattern: "meta" }];
+  }
+  const dv = cycle[variant % cycle.length]!;
+  const rest = cycle.filter((word) => word !== dv);
+  const shift = Math.floor(variant / cycle.length) % rest.length;
+  const others = [...rest.slice(shift), ...rest.slice(0, shift)];
+  const a = others[0] ?? "";
+  const b = others[1] ?? "";
+  const c = others[2] ?? "";
+  const plans: { parts: TopicParts; pattern: string }[] = [];
+  if (a) plans.push({ parts: { ...blank, iv: a, dv, mechanism: b }, pattern: "meta" });
+  if (c) plans.push({ parts: { ...blank, iv: c, dv }, pattern: "meta" });
+  else if (b) plans.push({ parts: { ...blank, iv: b, dv }, pattern: "meta" });
+  if (a && b) plans.push({ parts: { ...blank, iv: a, dv: b, mechanism: dv }, pattern: "meta" });
+  return plans;
+}
+
 /** 模型出不来时用规则出 3 个题。三个题的变量组合和问法彼此不同；variant 换一种组合，用于「换一批」。 */
 export function rulesCandidates(seed: TopicSeed, variant = 0): Candidate[] {
   if (seed.paradigm === "文本分析") return textCandidates(seed, variant);
@@ -294,11 +318,7 @@ export function rulesCandidates(seed: TopicSeed, variant = 0): Candidate[] {
   const fromLiterature = literaturePlans(seed, object, short, dv, method, variant);
   const plans: { parts: TopicParts; pattern: string; question?: string; hit?: TopicSeed["hits"][number] }[] =
     seed.paradigm === "元分析"
-      ? [
-          { parts: { object: "已发表研究", iv: a, dv, mechanism: b, method: "" }, pattern: "meta" },
-          { parts: { object: "已发表研究", iv: b || a, dv, mechanism: c, method: "" }, pattern: "meta" },
-          { parts: { object: "已发表研究", iv: c || a, dv, mechanism: a, method: "" }, pattern: "meta" },
-        ]
+      ? metaPlans(pool, variant)
       : fromLiterature ??
     (seed.paradigm === "定量"
       ? [
@@ -316,6 +336,7 @@ export function rulesCandidates(seed: TopicSeed, variant = 0): Candidate[] {
   plans.forEach((plan, index) => {
     let title = composeTitle(plan.parts, plan.pattern, seed.paradigm);
     if (seen.has(title)) {
+      if (seed.paradigm === "元分析") return;
       plan.parts = { ...plan.parts, method: plan.parts.method ? "" : method };
       title = composeTitle(plan.parts, plan.pattern, seed.paradigm);
     }

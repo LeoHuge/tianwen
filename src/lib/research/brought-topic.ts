@@ -15,6 +15,11 @@ export type BroughtRewrite = {
   provisional: boolean;
 };
 
+export type BroughtDemo = {
+  title: string;
+  lines: string[];
+};
+
 export type BroughtVerdict = {
   ok: boolean;
   title: string;
@@ -24,6 +29,7 @@ export type BroughtVerdict = {
   problems: string[];
   revisions: string[];
   rewrites: BroughtRewrite[];
+  demo: BroughtDemo | null;
   plan: string;
 };
 
@@ -66,6 +72,19 @@ export function inferParadigm(title: string): Paradigm | "" {
 
 function mainOf(title: string) {
   return (title.split("——")[0] ?? title).trim();
+}
+
+function looseMetaPair(title: string) {
+  const core = mainOf(title)
+    .replace(/[：:].*$/, "")
+    .replace(/的?元分析$/, "")
+    .replace(/的?(关系|影响|效应)$/, "");
+  const matched = /^(.{2,18})与(.{2,18})$/.exec(core);
+  if (!matched) return { left: "", right: "" };
+  const left = matched[1].replace(/的$/, "");
+  const right = matched[2].replace(/的$/, "");
+  if (left.length < 2 || right.length < 2 || left === right) return { left: "", right: "" };
+  return { left, right };
 }
 
 function pairOf(title: string) {
@@ -143,7 +162,15 @@ function structuralProblems(title: string, paradigm: Paradigm | "", object: stri
   }
   if (paradigm === "元分析") {
     if (!title.includes("元分析")) problems.push("元分析的题目需要写上「元分析」。");
-    if (!pairOf(title).left || !pairOf(title).right) problems.push("请写明要综合的两个变量。");
+    const pair = pairOf(title);
+    const loose = looseMetaPair(title);
+    if (pair.left && pair.right) {
+      if (pair.left === pair.right) problems.push("两个变量写成了同一个词。");
+    } else if (loose.left && loose.right) {
+      problems.push(`「${loose.left}」和「${loose.right}」已经写在题目里，还不是「变量甲与变量乙关系的元分析」。少了「关系」。`);
+    } else {
+      problems.push("请写明要综合的两个变量。");
+    }
     if (/r\s*=|d\s*=|I²|I2|p\s*[<=＜]|合并效应\s*[为是=＝]\s*\d/.test(title)) problems.push("题目里写了合并之后的效应。");
   }
   return problems;
@@ -309,6 +336,91 @@ function writePlan(input: {
   ].join("\n");
 }
 
+function revisionLine(paradigm: Paradigm | "") {
+  if (paradigm === "定量") return "补成「条件对研究对象的结果的影响」。横截面写成关联，不要写策略。";
+  if (paradigm === "定性") return "改成「情境如何形塑对象的经验」。不要写如何优化。";
+  if (paradigm === "文本分析") return "写成「《一份文本》中某一现象的内容分析」。一份文本、一个现象。";
+  if (paradigm === "元分析") return "写成「变量甲与变量乙关系的元分析」。两个变量都要出现，并写上「关系」。";
+  return "先选定做法。定量写条件和结果，定性写谁怎样经历，文本写一份文本的名称，元分析写两个变量并加上「关系的元分析」。";
+}
+
+function paradigmDemo(paradigm: Paradigm | ""): BroughtDemo {
+  if (paradigm === "定性") {
+    return {
+      title: "夜班如何形塑护士的交接经验",
+      lines: [
+        "夜班是情境，护士是访谈对象，交接经验是要理解的过程。",
+        "照这个换：情境和对象换成您的，句式「如何形塑」不要改。这句是示范，不要照抄。",
+        "下一步：改成这个句式后再评判。合格后才会写出研究方案和计划。现在还不能往下写。",
+      ],
+    };
+  }
+  if (paradigm === "文本分析") {
+    return {
+      title: "《小学语文教材》中课堂提问的内容分析",
+      lines: [
+        "书名号里是一份文本，课堂提问是要从中抽出的现象。",
+        "照这个换：书名和现象换成您的。一份文本、一个现象。这句是示范，不要照抄。",
+        "下一步：改成这个句式后再评判。合格后才会写出研究方案和计划。现在还不能往下写。",
+      ],
+    };
+  }
+  if (paradigm === "元分析") {
+    return {
+      title: "社会资本与预期寿命关系的元分析",
+      lines: [
+        "社会资本是变量甲，预期寿命是变量乙。",
+        "句式是「变量甲与变量乙关系的元分析」。合并效应不写进题目。",
+        "这句是示范。把变量甲、变量乙换成您自己的两个词，句式不要改。",
+        "下一步：改完再评判。合格后才会写出研究方案和计划。现在还不能往下写。",
+      ],
+    };
+  }
+  if (paradigm === "定量") {
+    return {
+      title: "契约环境对企业研发投入的影响",
+      lines: [
+        "契约环境是条件，企业是对象，研发投入是结果。横截面写成关联。",
+        "照这个换：条件和结果换成您的。这句是示范，不要照抄。",
+        "下一步：改成这个句式后再评判。合格后才会写出研究方案和计划。现在还不能往下写。",
+      ],
+    };
+  }
+  return {
+    title: "契约环境对企业研发投入的影响",
+    lines: [
+      "定量写成「条件对对象的结果的影响」。定性写成「情境如何形塑对象的经验」。",
+      "文本写成「《一份文本》中某一现象的内容分析」。元分析写成「变量甲与变量乙关系的元分析」。",
+      "先选定一种做法，再把您的词放进对应句式。这句是示范，不要照抄。",
+      "下一步：改完再评判。合格后才会写出研究方案和计划。现在还不能往下写。",
+    ],
+  };
+}
+
+function walkthrough(paradigm: Paradigm | "", rewrites: BroughtRewrite[], pair: { left: string; right: string }): BroughtDemo {
+  if (pair.left && pair.right && rewrites[0]) {
+    return {
+      title: rewrites[0].title,
+      lines: [
+        `「${pair.left}」是变量甲，「${pair.right}」是变量乙。`,
+        "句式是「变量甲与变量乙关系的元分析」。只补「关系」，两个词都用您原来的。",
+        "照这个再换一对词：社会支持与孤独感关系的元分析。这句是示范，不要照抄。",
+        "下一步：点「用这句再评判」。合格之后，这里才会写出研究方案和计划。现在还不能往下写。",
+      ],
+    };
+  }
+  if (rewrites[0]) {
+    return {
+      title: rewrites[0].title,
+      lines: [
+        "上面这句是按开题句式改出来的。句式不要改。标明示例的那个词，只替换那一个。",
+        "下一步：放进题目或用这句再评判。合格后才会写出研究方案和计划。现在还不能往下写。",
+      ],
+    };
+  }
+  return paradigmDemo(paradigm);
+}
+
 function finish(partial: Omit<BroughtVerdict, "plan"> & { object: string; discipline: string }): BroughtVerdict {
   const { object, discipline, ...rest } = partial;
   const plan = rest.ok && rest.paradigm ? writePlan({ title: rest.title, paradigm: rest.paradigm, object, discipline }) : "";
@@ -327,6 +439,7 @@ export function judgeBroughtTopic(input: BroughtInput): BroughtVerdict {
     problems: [] as string[],
     revisions: [] as string[],
     rewrites: [] as BroughtRewrite[],
+    demo: null,
     object,
     discipline,
   };
@@ -356,9 +469,13 @@ export function judgeBroughtTopic(input: BroughtInput): BroughtVerdict {
   const reading = stripEmpty(title);
   const bannedHits = wordsIn(title);
   const { method, setting } = splitSubstance(reading.substance);
-  const held = [setting ? `场所：${setting}` : "", method ? `现象或方法：${method}` : ""].filter(Boolean);
   const inferred = inferParadigm(title);
   const paradigm = input.paradigm || inferred;
+  const loose = looseMetaPair(title);
+  let held = [setting ? `场所：${setting}` : "", method ? `现象或方法：${method}` : ""].filter(Boolean);
+  if (loose.left && (paradigm === "元分析" || title.includes("元分析"))) {
+    held = [`变量：${loose.left}、${loose.right}`, ...held.filter((item) => !item.startsWith("现象或方法"))];
+  }
   let paradigmNote = "";
   if (paradigm && !input.paradigm) paradigmNote = `按题目里的写法，这是${paradigm}。若不是，请改选做法后再评判。`;
   if (input.paradigm && inferred && inferred !== input.paradigm) {
@@ -394,7 +511,7 @@ export function judgeBroughtTopic(input: BroughtInput): BroughtVerdict {
     problems.push("从题目里看不出是问卷、访谈、一份文本，还是元分析。");
   }
   for (const item of shape) {
-    if (reading.hits.length > 0 && /需要同时写明|需要写出要理解|看不出是谁|看不出找谁|需要一份|需要写上「元分析」|两个变量/.test(item)) continue;
+    if (reading.hits.length > 0 && /需要同时写明|需要写出要理解|看不出是谁|看不出找谁|需要一份|需要写上「元分析」|请写明要综合的两个变量/.test(item)) continue;
     if (/导致|造成/.test(title) && /需要同时写明/.test(item)) continue;
     problems.push(item);
   }
@@ -426,20 +543,34 @@ export function judgeBroughtTopic(input: BroughtInput): BroughtVerdict {
   } else if (problems.some((item) => item.includes("如何提升"))) {
     revisions.push("删去「提升」。提升是希望达到的目标，不是要理解的过程。");
     revisions.push("改成这一类人怎样经历这件事，或改成某个条件对某个结果的影响。目标和策略都不要留在题目里。");
+  } else if (loose.left && loose.right && (paradigm === "元分析" || title.includes("元分析"))) {
+    const repaired = composeTitle({ ...blankParts(), iv: loose.left, dv: loose.right }, "meta", "元分析");
+    rewrites = [
+      {
+        label: "元分析 · X与Y关系的元分析",
+        title: repaired,
+        provisional: false,
+        note: `两个变量仍是「${loose.left}」和「${loose.right}」。只补了「关系」。`,
+      },
+    ];
+    revisions.push(`改成「${repaired}」。`);
+    revisions.push("照这个换词：变量甲、变量乙换成您的两个词，「关系的元分析」不要改。");
   } else if (problems.length > 0 && reading.hits.length === 0) {
-    revisions.push("定量补上条件和结果。定性改成谁怎样做。文本写出一份文本的名称。元分析写出两个变量，并写上元分析。");
+    revisions.push(revisionLine(paradigm));
   }
 
   const uniqueProblems = [...new Set(problems)];
   const ok = uniqueProblems.length === 0 && Boolean(paradigm);
+  const shownRewrites = ok ? [] : rewrites;
   return finish({
     ...base,
     ok,
     paradigm,
     paradigmNote: ok ? paradigmNote : "",
-    held: ok ? [] : held.filter((item) => !rewrites.some((item2) => item.endsWith(item2.title))),
+    held: ok ? [] : held.filter((item) => !shownRewrites.some((item2) => item.endsWith(item2.title))),
     problems: uniqueProblems,
     revisions: [...new Set(revisions)],
-    rewrites: ok ? [] : rewrites,
+    rewrites: shownRewrites,
+    demo: ok ? null : walkthrough(paradigm, shownRewrites, loose),
   });
 }
